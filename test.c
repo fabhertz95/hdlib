@@ -1,8 +1,9 @@
 #include <string.h>
+#include <stdint.h>
 
 #include "test.h"
 
-void circshift(int * const dest, int * const src, const int sz, const int n)
+void circshift(int32_t * const dest, int32_t * const src, const int sz, const int n)
 {
     if (n > 0)
     {
@@ -20,13 +21,13 @@ void circshift(int * const dest, int * const src, const int sz, const int n)
     }
 }
 
-void circshift_inplace(int * const arr, const int sz, const int n)
+void circshift_inplace(int32_t * const arr, const int sz, const int n)
 {
     if (n > 0)
     {
         // shift right
         int shift = n;
-        int tmp[shift];
+        int32_t tmp[shift];
         memcpy(tmp, arr + (sz - shift), shift * sizeof arr[0]);
         memcpy(arr + shift, arr, (sz - shift) * sizeof arr[0]);
         memcpy(arr, tmp, shift * sizeof arr[0]);
@@ -35,7 +36,7 @@ void circshift_inplace(int * const arr, const int sz, const int n)
     {
         // shift left
         int shift = -n;
-        int tmp[shift];
+        int32_t tmp[shift];
         memcpy(tmp, arr, shift * sizeof arr[0]);
         memcpy(arr, arr + shift, (sz - shift) * sizeof arr[0]);
         memcpy(arr + (sz - shift), tmp, shift * sizeof arr[0]);
@@ -49,13 +50,11 @@ void circshift_inplace(int * const arr, const int sz, const int n)
 //   than next 1000 etc.
 // - binary HD vectors
 void ngrammencoding(
-    int * const output,
+    int32_t * const output,
     const int d,
     const int ngramm,
-    int * const block,
-    int * items,
-    int * const X,
-    const int start
+    int32_t * const block,
+    int32_t * item
 )
 {
     // shift current block to accommodate new entry
@@ -66,14 +65,14 @@ void ngrammencoding(
     }
 
     // write new first entry
-    memcpy(block, items + X[start] * d, d * sizeof block[0]);
+    memcpy(block, item, d * sizeof block[0]);
 
     // calculate n-gramm of the block
     memcpy(output, block, d * sizeof block[0]);
     for (int i = 1; i != ngramm; ++i)
     {
-        int * p_output = output;
-        int * p_block = block + (i * d);
+        int32_t * p_output = output;
+        int32_t * p_block = block + (i * d);
         for (int j = 0; j < d; ++j)
         {
             *p_output++ ^= *p_block++;

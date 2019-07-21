@@ -1,13 +1,11 @@
-void circshift(int * const dest, int * const src, const int sz, const int n);
+void circshift(int32_t * const dest, int32_t * const src, const int sz, const int n);
 
-void circshift_inplace(int * const arr, const int sz, const int n);
+void circshift_inplace(int32_t * const arr, const int sz, const int n);
 
 void ngrammencoding(
-    int * const output,
+    int32_t * const output,
     const int d,
     const int ngramm,
-    int * const block,
-    int * items,
-    int * const X,
-    const int start
+    int32_t * const block,
+    int32_t * item
 );

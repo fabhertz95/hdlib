@@ -53,6 +53,7 @@ class sng_encoder_ext(hd_encoder):
 		self._lib = self._ffi.dlopen(
 			os.path.join(path, f'test_{platform.machine()}.so')
 		)
+		# TODO: close self._lib
 
 
 	def encode(self, X):
@@ -73,18 +74,33 @@ class sng_encoder_ext(hd_encoder):
 
 	def _ngrammencoding(self, X, start):
 		output = t.Tensor(self._D).type(t.int32)
+		
+		item = self._itemMemory[X[start]]
 
 		self._lib.ngrammencoding(
-			self._ffi.cast('int * const', output.data_ptr()),
+			self._ffi.cast('int32_t * const', output.data_ptr()),
 			self._D,
 			self._ngramm,
-			self._ffi.cast('int * const', self._block.data_ptr()),
-			self._ffi.cast('int *', self._itemMemory.data_ptr()),
-			self._ffi.cast('int * const', X.data_ptr()),
-			start
+			self._ffi.cast('int32_t * const', self._block.data_ptr()),
+			self._ffi.cast('int32_t *', item.data_ptr())
 		)
 
 		return output
+
+	def _circshift(self, dest, src, n):
+		self._lib.circshift(
+			self._ffi.cast('int32_t * const', dest.data_ptr()),
+			self._ffi.cast('int32_t * const', src.data_ptr()),
+			self._D,
+			n
+		)
+
+	def _circshift_inplace(self, arr, n):
+		self._lib.circshift_inplace(
+			self._ffi.cast('int32_t * const', arr.data_ptr()),
+			self._D,
+			n
+		)
 
 	def clip(self):
 		'''
