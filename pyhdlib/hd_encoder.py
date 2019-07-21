@@ -22,6 +22,86 @@ class hd_encoder(ABC):
 	def clip(X):
 		pass
 
+class sng_encoder_ext(hd_encoder):
+	'''
+	Sum n-gramm encoder, external library binding
+	'''
+	
+	def __init__(self, D, nitem, ngramm):
+		self._D = D
+		self._ngramm = ngramm
+
+		# malloc for Ngramm block, ngramm result, and sum vector  
+		self._block = t.Tensor(self._ngramm,self._D).type(t.int32)
+		self._Y = t.Tensor(self._D).type(t.int32)
+		self._SumVec= t.Tensor(self._D).type(t.int32)
+
+		self._add_cnt = 0
+
+		# item memory initialization 
+		self._itemMemory = t.randint(0,2,(nitem,D), dtype=t.int32)
+
+		import cffi
+		import os
+		import platform
+		
+		self._ffi = cffi.FFI()
+		path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
+		#path = '.'
+		self._ffi.cdef(open(os.path.join(path, 'test.h'), 'r').read())
+
+		self._lib = self._ffi.dlopen(
+			os.path.join(path, f'test_{platform.machine()}.so')
+		)
+
+
+	def encode(self, X):
+		# reset block to zero
+		self._block.zero_()
+		self._SumVec.zero_()
+
+		n_samlpes, n_feat = X.shape
+		self._add_cnt = 0
+		
+		for feat_idx in range(n_feat): 
+			ngramm = self._ngrammencoding(X[0],feat_idx)
+			if feat_idx >= self._ngramm-1:
+				self._SumVec.add_(ngramm)
+				self._add_cnt +=1
+
+		return self._SumVec.type(t.float), self._add_cnt
+
+	def _ngrammencoding(self, X, start):
+		output = t.Tensor(self._D).type(t.int32)
+
+		self._lib.ngrammencoding(
+			self._ffi.cast('int * const', output.data_ptr()),
+			self._D,
+			self._ngramm,
+			self._ffi.cast('int * const', self._block.data_ptr()),
+			self._ffi.cast('int *', self._itemMemory.data_ptr()),
+			self._ffi.cast('int * const', X.data_ptr()),
+			start
+		)
+
+		return output
+
+	def clip(self):
+		'''
+		Clip sum of ngramms to 1-bit values
+		'''
+
+		# Add random vector to break ties
+		if self._add_cnt % 2 == 0:
+			self._SumVec.add_(t.randint(0,2,(self._D,), dtype=t.int32))
+			self._add_cnt += 1
+		
+		self._SumVec = (self._SumVec > (self._add_cnt/2)).type(t.int32)
+		self._add_cnt = 1
+
+		return self._SumVec.type(t.float), self._add_cnt
+
+
 class sng_encoder(hd_encoder):
 	'''
 	Sum n-gramm encoder

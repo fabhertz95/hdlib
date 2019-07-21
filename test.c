@@ -48,7 +48,7 @@ void circshift_inplace(int * const arr, const int sz, const int n)
 //   for D=10000 encode the whole input using first 1000 vector elements,
 //   than next 1000 etc.
 // - binary HD vectors
-void _ngrammencoding(
+void ngrammencoding(
     int * const output,
     const int d,
     const int ngramm,
