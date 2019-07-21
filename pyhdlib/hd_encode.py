@@ -178,7 +178,7 @@ class hd_encode():
 			X.add_(t.randint(0,2,(self._D,)).type(t.FloatTensor).to(self._device)) # add random vector 
 			cnt += 1
 		
-		return (X > (cnt/2)).type(t.cuda.FloatTensor)
+		return (X > (cnt/2)).type(t.FloatTensor)
 
 
 	
