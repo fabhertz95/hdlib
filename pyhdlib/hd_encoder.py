@@ -56,22 +56,6 @@ class sng_encoder(hd_encoder):
 
 		return 
 
-	def _lookupItemMemory(self,key):
-		'''	
-		Encoding
-
-		Parameters
-		----------
-		key: int 
-			key to itemmemory
-
-		Return
-		------
-		out: Torch tensor, size=[D,]
-		'''
-		return self._itemMemory[key]
-
-
 	def encode(self, X):
 		'''	
 		compute sum of ngramms
@@ -133,7 +117,7 @@ class sng_encoder(hd_encoder):
 		for i in range(self._ngramm-1,0,-1): 
 			self._block[i] = self._circshift(self._block[i-1],1)
 		# write new first entry 
-		self._block[0] = self._lookupItemMemory(X[start])
+		self._block[0] = self._itemMemory[X[start]]
 
 		# calculate ngramm of _block
 		self._Y = self._block[0]
