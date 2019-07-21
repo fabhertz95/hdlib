@@ -129,8 +129,9 @@ class am_classifier:
 		hd_dist = t.Tensor(n_samples,self._n_classes).zero_().to(self._device)
 
 		for sample in range(n_samples): 
-			# encode samples 
-			enc_vec, _ = self._encoder.encode(X[sample].view(1,-1),True)
+			# encode samples
+			self._encoder.encode(X[sample].view(1,-1))
+			enc_vec, _ = self._encoder.clip()
 			# calculate hamming distance for every class
 			for y_s in range(self._n_classes): 
 				hd_dist[sample,y_s] = self.hamming_distance(enc_vec,self._am[y_s])

@@ -11,7 +11,7 @@ import numpy as np
 import cloudpickle as cpckl
 
 
-from hd_encode import hd_encode
+from hd_encode import sng_encoder
 from am_classifier import am_classifier
 
 
@@ -31,6 +31,7 @@ class hd_classifier(am_classifier):
 		encode: hd_encoding class
 			encoding class 
 		'''
+
 		self._name = name
 		try:
 			self.load()
@@ -39,7 +40,10 @@ class hd_classifier(am_classifier):
 			use_cuda = t.cuda.is_available() 
 			_device = t.device(device if use_cuda else "cpu")
 	
-			_encoder = hd_encode(D,encoding,_device,nitem,ngramm)
+			if encoding is 'sumNgramm':
+				_encoder = sng_encoder(D, _device, nitem, ngramm)
+			else:
+				raise ValueError(f'{encoding} encoding not supported')
 
 			super().__init__(D,_encoder,_device)
 		

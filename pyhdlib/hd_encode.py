@@ -6,42 +6,49 @@ HD encoding class
 =================
 '''
 import torch as t 
-
+from abc import ABC, abstractmethod
 
 __author__ = "Michael Hersche"
 __email__ = "herschmi@ethz.ch"
 __date__ = "17.5.2019"
 
 
+class hd_encoder(ABC):
+	@abstractmethod
+	def encode(X):
+		pass
 
-class hd_encode():
-	def __init__(self,D,encoding,device,nitem=1,ngramm = 3):
+	@abstractmethod
+	def clip(X):
+		pass
+
+class sng_encoder(hd_encoder):
+	'''
+	Sum n-gramm encoder
+	'''
+
+	def __init__(self, D, device, nitem=1, ngramm = 3):
 		'''	
-		Encoding 
+		Encoding
+
 		Parameters
 		----------
-		encoding: string 
-			Encoding architecture {"sumNgramm"}
 		nitem: int
 			number of items in itemmemory 
 		ngramm: int
 			number of ngramms
-
-		
 		'''
+		
 		self._D = D
 		self._device = device
-		# encoding scheme 
-		if encoding =="sumNgramm":
-			self.encode = self._compute_sumNgramm 
-			self._ngramm = ngramm
-			# malloc for Ngramm block, ngramm result, and sum vector  
-			self._block = t.Tensor(self._ngramm,self._D).zero_().to(self._device)
-			self._Y = t.Tensor(self._D).to(self._device)
-			self._SumVec= t.Tensor(self._D).zero_().to(self._device)
+		self._ngramm = ngramm
+		
+		# malloc for Ngramm block, ngramm result, and sum vector  
+		self._block = t.Tensor(self._ngramm,self._D).zero_().to(self._device)
+		self._Y = t.Tensor(self._D).to(self._device)
+		self._SumVec= t.Tensor(self._D).zero_().to(self._device)
 
-		else: 
-			raise ValueError("No valid encoding! got "+ code)
+		self._add_cnt = 0
 
 		# item memory initialization 
 		self._itemMemory = t.randint(0,2,(nitem,D)).to(self._device)
@@ -51,11 +58,13 @@ class hd_encode():
 
 	def _lookupItemMemory(self,key):
 		'''	
-		Encoding 
+		Encoding
+
 		Parameters
 		----------
 		key: int 
 			key to itemmemory
+
 		Return
 		------
 		out: Torch tensor, size=[D,]
@@ -63,37 +72,48 @@ class hd_encode():
 		return self._itemMemory[key]
 
 
-	def _compute_sumNgramm(self,X,clip=False):
+	def encode(self, X):
 		'''	
-		compute sum of ngramms 
+		compute sum of ngramms
+
 		Parameters
 		----------
 		X: torch tensor, size = [n_samples,n_feat] 
 			feature vectors
+
 		Return
 		------
-
+		SumVec: torch tensor, size = [D,]
+			sum of encoded n-gramms
+		add_cnd: int
+			number of encoded n-gramms
 		'''
+
 		# reset block to zero
 		self._block.zero_().to(self._device)
 		self._SumVec.zero_()
 
 
 		n_samlpes,n_feat = X.shape
-		add_cnt = 0
+		self._add_cnt = 0
 		
 		for feat_idx in range(n_feat): 
 			ngramm = self._ngrammencoding(X[0],feat_idx)
 			if feat_idx >= self._ngramm-1:
 				self._SumVec.add_(ngramm)
-				add_cnt +=1
+				self._add_cnt +=1
 
-		if clip: 
-			self._SumVec = self._threshold(self._SumVec,add_cnt)
-			add_cnt = 1
+		return self._SumVec, self._add_cnt
+
+	def clip(self):
+		'''
+		clip sum of ngramms to 1-bit values
+		'''
+
+		self._SumVec = self._threshold(self._SumVec, self._add_cnt)
+		self._add_cnt = 1
 			
-		# put here clipping option 
-		return self._SumVec, add_cnt
+		return self._SumVec, self._add_cnt
 
 	def _ngrammencoding(self,X,start):
 		'''	
@@ -161,6 +181,7 @@ class hd_encode():
 	def _threshold(self,X,cnt):
 		'''	
 		Threshold a vector to binary 
+
 		Parameters
 		----------
 		X : Torch tensor, size = [D,]
@@ -180,12 +201,3 @@ class hd_encode():
 		
 		return (X > (cnt/2)).type(t.FloatTensor)
 
-
-	
-
-
-
-
-		
-
-		
