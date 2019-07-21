@@ -1,5 +1,7 @@
 #include <string.h>
 
+#include "test.h"
+
 void circshift(int * const dest, int * const src, const int sz, const int n)
 {
     if (n > 0)
