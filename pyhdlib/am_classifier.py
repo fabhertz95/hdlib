@@ -56,8 +56,8 @@ class am_classifier:
         y: numpy array, size = [n_samples]
                 Training labels
         '''
-        X = t.from_numpy(X).type(t.LongTensor).to(self._device)
-        y = t.from_numpy(y).type(t.LongTensor).to(self._device)
+        X = t.from_numpy(X).type(t.int32).to(self._device)
+        y = t.from_numpy(y).type(t.int32).to(self._device)
 
         n_samples = X.shape[0]
         # summation of training vectors
@@ -125,7 +125,7 @@ class am_classifier:
                 predicted values.
 
         '''
-        X = t.from_numpy(X).type(t.LongTensor).to(self._device)
+        X = t.from_numpy(X).type(t.int32).to(self._device)
         n_samples = X.shape[0]
         dec_values = t.Tensor(n_samples).to(self._device)
         hd_dist = t.Tensor(n_samples, self._n_classes).zero_().to(self._device)

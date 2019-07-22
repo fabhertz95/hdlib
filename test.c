@@ -95,11 +95,7 @@ void ngrammencoding_string (
     // loop over every feature (character of the text)
     for (int feat_idx = 0; feat_idx < n_feat; feat_idx++) {
         // get position of item in itemMemory for current feature (character)
-        //int32_t char_idx = data[feat_idx];
-        // TODO normally accessing the element does not work! Every second item is zero.
-        // Therefore, I just multiply it here by 2.
-        // The result is exactly the same as in the python implementation!
-        int32_t char_idx = *(data + feat_idx * 2);
+        int32_t char_idx = data[feat_idx];
 
         // get pointer to item
         int32_t * p_item = itemMemory + (char_idx) * d;
