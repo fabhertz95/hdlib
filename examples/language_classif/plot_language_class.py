@@ -11,16 +11,14 @@ __author__ = "Michael Hersche"
 __email__ = "herschmi@ethz.ch"
 __date__ = "20.5.2019"
 
-
-from load_data import load_data
-from hd_classifier import hd_classifier, bin2int
-import time
 import sys
+import time
 import numpy as np
-
 
 sys.path.append('../../pyhdlib/')
 
+from load_data import load_data
+from hd_classifier import hd_classifier, bin2int
 
 training = True
 testing = True
