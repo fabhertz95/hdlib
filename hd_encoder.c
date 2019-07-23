@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "test.h"
+#include "hd_encoder.h"
 
 void circshift(int32_t * const dest, int32_t * const src, const int sz, const int n)
 {

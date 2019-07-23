@@ -138,10 +138,10 @@ class sng_encoder_ext_enc(hd_encoder):
         self._ffi = cffi.FFI()
         path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
         # path = '.'
-        self._ffi.cdef(open(os.path.join(path, 'test.h'), 'r').read())
+        self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
 
         self._lib = self._ffi.dlopen(
-            os.path.join(path, f'test_{platform.machine()}.so')
+            os.path.join(path, f'hd_encoder_{platform.machine()}.so')
         )
         # TODO: close self._lib
 
@@ -227,10 +227,10 @@ class sng_encoder_ext(hd_encoder):
         self._ffi = cffi.FFI()
         path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
         # path = '.'
-        self._ffi.cdef(open(os.path.join(path, 'test.h'), 'r').read())
+        self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
 
         self._lib = self._ffi.dlopen(
-            os.path.join(path, f'test_{platform.machine()}.so')
+            os.path.join(path, f'hd_encoder_{platform.machine()}.so')
         )
         # TODO: close self._lib
 
