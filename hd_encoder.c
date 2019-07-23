@@ -58,7 +58,7 @@ void hd_encoder_init(
     p_state->d = d;
     p_state->ngramm = ngramm;
     p_state->ngramm_buffer = malloc(d * sizeof(int32_t));
-    p_state->encoder_buffer = malloc(d * sizeof(int32_t));
+    p_state->ngramm_sum_buffer = malloc(d * sizeof(int32_t));
     p_state->item_buffer = malloc(ngramm * d * sizeof(int32_t));
     p_state->item_lookup = malloc(n_items * d * sizeof(int32_t));
 
@@ -73,7 +73,7 @@ void hd_encoder_init(
 //   for D=10000 encode the whole input using first 1000 vector elements,
 //   than next 1000 etc.
 // - binary HD vectors
-void ngrammencoding(
+void hd_encoder_encode_ngramm(
     const struct hd_encoder_t * const p_state,
     int32_t * const item
 )
@@ -106,7 +106,7 @@ void ngrammencoding(
 
 }
 
-void ngrammencoding_string (
+void hd_encoder_encode (
     struct hd_encoder_t * const p_state,
     int32_t * const data,
     const int n_data
@@ -115,10 +115,10 @@ void ngrammencoding_string (
     const int d = p_state->d;
     const int ngramm = p_state->ngramm;
 
-    memset(p_state->encoder_buffer, 0, p_state->d * sizeof(p_state->encoder_buffer[0]));
-    p_state->encoder_count = 0;
+    memset(p_state->ngramm_sum_buffer, 0, p_state->d * sizeof(p_state->ngramm_sum_buffer[0]));
+    p_state->ngramm_sum_count = 0;
 
-    memset(p_state->item_buffer, 0, p_state->d * p_state->ngramm * sizeof(p_state->encoder_buffer[0]));
+    memset(p_state->item_buffer, 0, p_state->d * p_state->ngramm * sizeof(p_state->ngramm_sum_buffer[0]));
 
     // loop over every feature (character of the text)
     for (int feat_idx = 0; feat_idx < n_data; feat_idx++) {
@@ -129,11 +129,11 @@ void ngrammencoding_string (
         int32_t * p_item = p_state->item_lookup + (char_idx) * d;
 
         // do ngrammencoding, store temporary result in output
-        ngrammencoding(p_state, p_item);
+        hd_encoder_encode_ngramm(p_state, p_item);
 
         if (feat_idx >= ngramm - 1) {
             // add temporary output to sumVec
-            int32_t * p_sumVec = p_state->encoder_buffer;
+            int32_t * p_sumVec = p_state->ngramm_sum_buffer;
             int32_t * p_tmp_ngramm = p_state->ngramm_buffer;
             for (int j = 0; j < d; j++) {
                 *p_sumVec++ += *p_tmp_ngramm++;
@@ -141,7 +141,7 @@ void ngrammencoding_string (
         }
     }
 
-    p_state->encoder_count += n_data - (p_state->ngramm - 1);
+    p_state->ngramm_sum_count += n_data - (p_state->ngramm - 1);
 }
 
 void hd_encoder_clip(
@@ -149,21 +149,21 @@ void hd_encoder_clip(
 )
 {
     // Add a random vector to break ties if case an odd number of elements were summed
-    if (p_state->encoder_count % 2 == 0)
+    if (p_state->ngramm_sum_count % 2 == 0)
     {
         for (int i = 0; i < p_state->d; i++)
         {
-            p_state->encoder_buffer[i] += rand() % 2;
+            p_state->ngramm_sum_buffer[i] += rand() % 2;
         }
-        p_state->encoder_count++;
+        p_state->ngramm_sum_count++;
     }
 
-    int threshold = p_state->encoder_count / 2;
+    int threshold = p_state->ngramm_sum_count / 2;
 
     for (int i = 0; i < p_state->d; i++)
     {
         // Set to 1 if above threshold and 0 otherwise
-        p_state->encoder_buffer[i] = ((uint32_t)(threshold - p_state->encoder_buffer[i])) >> 31;
+        p_state->ngramm_sum_buffer[i] = ((uint32_t)(threshold - p_state->ngramm_sum_buffer[i])) >> 31;
     }
-    p_state->encoder_count = 1;
+    p_state->ngramm_sum_count = 1;
 }

@@ -12,8 +12,8 @@ struct hd_encoder_t
 
     // encoded n-gramm summation buffer
     // shape: [d]
-    int32_t * encoder_buffer;
-    int encoder_count;
+    int32_t * ngramm_sum_buffer;
+    int ngramm_sum_count;
 
     // HD vector n-gramm buffer
     // shape: [ngramm, d]
@@ -31,12 +31,12 @@ void hd_encoder_init(
     const int n_items
 );
 
-void ngrammencoding(
+void hd_encoder_encode_ngramm(
     const struct hd_encoder_t * const p_state,
     int32_t * item
 );
 
-void ngrammencoding_string (
+void hd_encoder_encode (
     struct hd_encoder_t * const p_state,
     int32_t * const data,
     const int n_data

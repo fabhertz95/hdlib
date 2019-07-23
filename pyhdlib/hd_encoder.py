@@ -122,32 +122,32 @@ class sng_encoder_ext(hd_encoder):
         # overwrite the encoder summing buffer with a torch tensor's pointer
         # this is so that the result can be communicated without copying
         # TODO this will likely be unnecesary in the future
-        self._SumVec = t.Tensor(D).type(t.int32).contiguous()
-        self._data.encoder_buffer = self._ffi.cast('int32_t * const', self._SumVec.data_ptr())
+        self._ngramm_sum_buffer = t.Tensor(D).type(t.int32).contiguous()
+        self._data.ngramm_sum_buffer = self._ffi.cast('int32_t * const', self._ngramm_sum_buffer.data_ptr())
 
         # TODO: release memory and close self._lib
 
     def encode(self, X):
-        self._data.encoder_buffer = self._ffi.cast('int32_t * const', self._SumVec.data_ptr())
+        self._data.ngramm_sum_buffer = self._ffi.cast('int32_t * const', self._ngramm_sum_buffer.data_ptr())
         # TODO something breaks without the previous line
 
         # compute dimensionality
         n_samples, n_feat = X.shape
 
-        self._lib.ngrammencoding_string(
+        self._lib.hd_encoder_encode(
             self._data,
             self._ffi.cast('int32_t * const', X.data_ptr()),
             n_feat
         )
 
-        return self._SumVec.type(t.float), self._data.encoder_count
+        return self._ngramm_sum_buffer.type(t.float), self._data.ngramm_sum_count
 
     def clip(self):
         self._lib.hd_encoder_clip(
             self._data
         )
         
-        return self._SumVec.type(t.float), self._data.encoder_count
+        return self._ngramm_sum_buffer.type(t.float), self._data.ngramm_sum_count
 
 
 class sng_encoder(hd_encoder):
