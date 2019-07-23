@@ -4,29 +4,7 @@
 
 #include "hd_encoder.h"
 
-void circshift(int32_t * const dest, int32_t * const src, const int sz, const int n);
-
-void circshift_inplace(int32_t * const arr, const int sz, const int n);
-
-void circshift(int32_t * const dest, int32_t * const src, const int sz, const int n)
-{
-    if (n > 0)
-    {
-        // shift right
-        int shift = n;
-        memcpy(dest, src + (sz - shift), shift * sizeof src[0]);
-        memcpy(dest + shift, src, (sz - shift) * sizeof src[0]);
-    }
-    if (n < 0)
-    {
-        // shift left
-        int shift = -n;
-        memcpy(dest + (sz - shift), src, shift * sizeof src[0]);
-        memcpy(dest, src + shift, (sz - shift) * sizeof src[0]);
-    }
-}
-
-void circshift_inplace(int32_t * const arr, const int sz, const int n)
+void circshift(int32_t * const arr, const int sz, const int n)
 {
     if (n > 0)
     {
@@ -60,9 +38,10 @@ void hd_encoder_init(
     p_state->ngramm_buffer = malloc(d * sizeof(int32_t));
     p_state->ngramm_sum_buffer = malloc(d * sizeof(int32_t));
     p_state->item_buffer = malloc(ngramm * d * sizeof(int32_t));
+    p_state->item_buffer_head = 0;
     p_state->item_lookup = malloc(n_items * d * sizeof(int32_t));
 
-    // Initialise HD vector lookup table with uniformly distributed 0s and 1s
+    // initialise HD vector lookup table with uniformly distributed 0s and 1s
     for (int i = 0; i < n_items * d; ++i)
         p_state->item_lookup[i] = rand() % 2;
 }
@@ -74,33 +53,40 @@ void hd_encoder_init(
 //   than next 1000 etc.
 // - binary HD vectors
 void hd_encoder_encode_ngramm(
-    const struct hd_encoder_t * const p_state,
+    struct hd_encoder_t * const p_state,
     int32_t * const item
 )
 {
     const int d = p_state->d;
     const int ngramm = p_state->ngramm;
-    int32_t * block = p_state->item_buffer;
+    int32_t * buf = p_state->item_buffer;
 
-    // shift current block to accommodate new entry
-    // TODO: convert to a circular buffer and shift in-place
-    for (int i = ngramm - 1; i != 0; --i)
+    int *p_head = &p_state->item_buffer_head;
+
+    // advance item circular buffer head
+    *p_head = (*p_head + 1) % ngramm;
+
+    // transform previous items
+    for (int i = 0; i < ngramm; i++)
     {
-        circshift(&block[d * i], block + d * (i - 1), d, 1);
+        if (i != *p_head)
+        {
+            circshift(&buf[d * i], d, 1);
+        }
     }
 
     // write new first entry
-    memcpy(block, item, d * sizeof block[0]);
+    memcpy(buf + d * p_state->item_buffer_head, item, d * sizeof buf[0]);
 
-    // calculate n-gramm of the block
-    memcpy(p_state->ngramm_buffer, block, d * sizeof block[0]);
+    // calculate n-gramm of all items
+    memcpy(p_state->ngramm_buffer, buf, d * sizeof buf[0]);
     for (int i = 1; i != ngramm; i++)
     {
-        int32_t * p_output = p_state->ngramm_buffer;
-        int32_t * p_block = block + (i * d);
+        int32_t * output_iter = p_state->ngramm_buffer;
+        int32_t * buf_iter = buf + (i * d);
         for (int j = 0; j < d; j++)
         {
-            *p_output++ ^= *p_block++;
+            *output_iter++ ^= *buf_iter++;
         }
     }
 
@@ -148,7 +134,7 @@ void hd_encoder_clip(
     struct hd_encoder_t * const p_state
 )
 {
-    // Add a random vector to break ties if case an odd number of elements were summed
+    // add a random vector to break ties if case an odd number of elements were summed
     if (p_state->ngramm_sum_count % 2 == 0)
     {
         for (int i = 0; i < p_state->d; i++)
@@ -162,7 +148,7 @@ void hd_encoder_clip(
 
     for (int i = 0; i < p_state->d; i++)
     {
-        // Set to 1 if above threshold and 0 otherwise
+        // set to 1 if above threshold and 0 otherwise
         p_state->ngramm_sum_buffer[i] = ((uint32_t)(threshold - p_state->ngramm_sum_buffer[i])) >> 31;
     }
     p_state->ngramm_sum_count = 1;
