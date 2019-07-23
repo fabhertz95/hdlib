@@ -187,21 +187,26 @@ class sng_encoder_ext(hd_encoder):
 
         self._add_cnt = 0
 
-        # item memory initialization
         self._itemMemory = t.randint(0, 2, (nitem, D), dtype=t.int32)
 
         import cffi
         import os
         import platform
 
-        self._ffi = cffi.FFI()
         path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
-        # path = '.'
+        
+        self._ffi = cffi.FFI()
         self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
-
         self._lib = self._ffi.dlopen(
             os.path.join(path, f'hd_encoder_{platform.machine()}.so')
         )
+
+        self._data = self._ffi.new('struct hd_encoder_t *')
+        self._lib.hd_encoder_init(self._data, D, ngramm, nitem)
+
+        # item memory initialization
+        #self._data.item_lookup = t.randint(0, 2, (nitem, D), dtype=t.int32).data_ptr()
+
         # TODO: close self._lib
 
     def encode(self, X):
@@ -222,14 +227,12 @@ class sng_encoder_ext(hd_encoder):
 
     def _ngrammencoding(self, X, start):
         output = t.Tensor(self._D).type(t.int32)
+        self._data.ngramm_buffer = self._ffi.cast('int32_t *', output.data_ptr()) # TODO temp
 
         item = self._itemMemory[X[start]]
 
         self._lib.ngrammencoding(
-            self._ffi.cast('int32_t * const', output.data_ptr()),
-            self._D,
-            self._ngramm,
-            self._ffi.cast('int32_t * const', self._block.data_ptr()),
+            self._data,
             self._ffi.cast('int32_t *', item.data_ptr())
         )
 
