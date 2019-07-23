@@ -3,5 +3,5 @@ examples/language_classif/data/*
 examples/language_classif/__pycache__/*
 pyhdlib/__pycache__/*
 *.swp
-test_x86_64.so
+*.so
 

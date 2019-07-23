@@ -12,7 +12,7 @@ import numpy as np
 import cloudpickle as cpckl
 
 
-from hd_encoder import sng_encoder
+from hd_encoder import sng_encoder_bv
 from am_classifier import am_classifier
 
 
@@ -34,6 +34,11 @@ class hd_classifier(am_classifier):
                 encoding class
         '''
 
+        # make sure that D is a multiple of 32
+        if D % 32 != 0:
+            D = (int(D / 32) + 1) * 32
+            print(f"Dimensionality given which is not a multiple of 32! Using {D} instead")
+
         self._name = name
         try:
             self.load()
@@ -43,7 +48,7 @@ class hd_classifier(am_classifier):
             _device = t.device(device if use_cuda else "cpu")
 
             if encoding is 'sumNgramm':
-                _encoder = sng_encoder(D, _device, nitem, ngramm)
+                _encoder = sng_encoder_bv(D, nitem, ngramm)
             else:
                 raise ValueError(f'{encoding} encoding not supported')
 
