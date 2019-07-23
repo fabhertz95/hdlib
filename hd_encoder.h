@@ -37,13 +37,7 @@ void ngrammencoding(
 );
 
 void ngrammencoding_string (
-    const struct hd_encoder_t * const p_state,
-    int32_t * const output,
-    const int d,
-    const int ngramm,
-    const int n_feat,
+    struct hd_encoder_t * const p_state,
     int32_t * const data,
-    int32_t * const block,
-    int32_t * const itemMemory,
-    int32_t * const tmp_ngramm
+    const int n_data
 );

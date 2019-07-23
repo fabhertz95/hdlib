@@ -98,79 +98,6 @@ class sng_encoder_bv(hd_encoder):
         return self._SumVec.type(t.float), self._add_cnt
 
 
-class sng_encoder_ext_enc(hd_encoder):
-    '''
-    Sum n-gramm encoder, external library binding for encoding completely in C
-    '''
-    def __init__(self, D, nitem, ngramm):
-        self._D = D
-        self._ngramm = ngramm
-
-        # malloc for Ngramm block, ngramm result, and sum vector
-        self._block = t.Tensor(self._ngramm, self._D).type(t.int32)
-        self._Y = t.Tensor(self._D).type(t.int32)
-        self._SumVec = t.Tensor(self._D).type(t.int32)
-
-        self._add_cnt = 0
-
-        # item memory initialization
-        self._itemMemory = t.randint(0, 2, (nitem, D), dtype=t.int32)
-
-        import cffi
-        import os
-        import platform
-
-        self._ffi = cffi.FFI()
-        path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
-        # path = '.'
-        self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
-
-        self._lib = self._ffi.dlopen(
-            os.path.join(path, f'hd_encoder_{platform.machine()}.so')
-        )
-        # TODO: close self._lib
-
-    def encode(self, X):
-        # reset block to zero
-        self._block.zero_()
-        self._SumVec.zero_()
-
-        # compute dimensionality
-        n_samples, n_feat = X.shape
-
-        # prepare data
-        tmp_ngramm = t.zeros(self._D).type(t.int32)
-
-        self._lib.ngrammencoding_string(
-            self._ffi.cast('int32_t * const', self._SumVec.data_ptr()),
-            self._D,
-            self._ngramm,
-            n_feat,
-            self._ffi.cast('int32_t * const', X.data_ptr()),
-            self._ffi.cast('int32_t * const', self._block.data_ptr()),
-            self._ffi.cast('int32_t * const', self._itemMemory.data_ptr()),
-            self._ffi.cast('int32_t * const', tmp_ngramm.data_ptr()),
-        )
-
-        self._add_cnt = n_feat - (self._ngramm - 1)
-        return self._SumVec.type(t.float), self._add_cnt
-
-    def clip(self):
-        '''
-        Clip sum of ngramms to 1-bit values
-        '''
-
-        # Add random vector to break ties
-        if self._add_cnt % 2 == 0:
-            self._SumVec.add_(t.randint(0, 2, (self._D,), dtype=t.int32))
-            self._add_cnt += 1
-
-        self._SumVec = (self._SumVec > (self._add_cnt / 2)).type(t.int32)
-        self._add_cnt = 1
-
-        return self._SumVec.type(t.float), self._add_cnt
-
-
 class sng_encoder_ext(hd_encoder):
     '''
     Sum n-gramm encoder, external library binding
@@ -210,33 +137,19 @@ class sng_encoder_ext(hd_encoder):
         # TODO: close self._lib
 
     def encode(self, X):
-        # reset block to zero
-        self._block.zero_()
-        self._SumVec.zero_()
+        self._data.encoder_buffer = self._ffi.cast('int32_t * const', self._SumVec.data_ptr())
 
-        n_samlpes, n_feat = X.shape
-        self._add_cnt = 0
+        # compute dimensionality
+        n_samples, n_feat = X.shape
 
-        for feat_idx in range(n_feat):
-            ngramm = self._ngrammencoding(X[0], feat_idx)
-            if feat_idx >= self._ngramm - 1:
-                self._SumVec.add_(ngramm)
-                self._add_cnt += 1
-
-        return self._SumVec.type(t.float), self._add_cnt
-
-    def _ngrammencoding(self, X, start):
-        output = t.Tensor(self._D).type(t.int32)
-        self._data.ngramm_buffer = self._ffi.cast('int32_t *', output.data_ptr()) # TODO temp
-
-        item = self._itemMemory[X[start]]
-
-        self._lib.ngrammencoding(
+        self._lib.ngrammencoding_string(
             self._data,
-            self._ffi.cast('int32_t *', item.data_ptr())
+            self._ffi.cast('int32_t * const', X.data_ptr()),
+            n_feat
         )
 
-        return output
+        self._add_cnt = n_feat - (self._ngramm - 1)
+        return self._SumVec.type(t.float), self._add_cnt
 
     def clip(self):
         '''

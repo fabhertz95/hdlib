@@ -95,11 +95,11 @@ void ngrammencoding(
 
     // calculate n-gramm of the block
     memcpy(p_state->ngramm_buffer, block, d * sizeof block[0]);
-    for (int i = 1; i != ngramm; ++i)
+    for (int i = 1; i != ngramm; i++)
     {
         int32_t * p_output = p_state->ngramm_buffer;
         int32_t * p_block = block + (i * d);
-        for (int j = 0; j < d; ++j)
+        for (int j = 0; j < d; j++)
         {
             *p_output++ ^= *p_block++;
         }
@@ -108,31 +108,33 @@ void ngrammencoding(
 }
 
 void ngrammencoding_string (
-    const struct hd_encoder_t * const p_state,
-    int32_t * const sumVec,
-    const int d,
-    const int ngramm,
-    const int n_feat,
+    struct hd_encoder_t * const p_state,
     int32_t * const data,
-    int32_t * const block,
-    int32_t * const itemMemory,
-    int32_t * const tmp_ngramm
+    const int n_data
 )
 {
+    const int d = p_state->d;
+    const int ngramm = p_state->ngramm;
+
+    memset(p_state->encoder_buffer, 0, p_state->d * sizeof(p_state->encoder_buffer[0]));
+    p_state->encoder_count = 0;
+
+    memset(p_state->item_buffer, 0, p_state->d * p_state->ngramm * sizeof(p_state->encoder_buffer[0]));
+
     // loop over every feature (character of the text)
-    for (int feat_idx = 0; feat_idx < n_feat; feat_idx++) {
+    for (int feat_idx = 0; feat_idx < n_data; feat_idx++) {
         // get position of item in itemMemory for current feature (character)
         int32_t char_idx = data[feat_idx];
 
         // get pointer to item
-        int32_t * p_item = itemMemory + (char_idx) * d;
+        int32_t * p_item = p_state->item_lookup + (char_idx) * d;
 
         // do ngrammencoding, store temporary result in output
         ngrammencoding(p_state, p_item);
 
         if (feat_idx >= ngramm - 1) {
             // add temporary output to sumVec
-            int32_t * p_sumVec = sumVec;
+            int32_t * p_sumVec = p_state->encoder_buffer;
             int32_t * p_tmp_ngramm = p_state->ngramm_buffer;
             for (int j = 0; j < d; j++) {
                 *p_sumVec++ += *p_tmp_ngramm++;
