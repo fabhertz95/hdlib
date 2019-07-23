@@ -82,21 +82,6 @@ class sng_encoder_bv(hd_encoder):
         self._add_cnt = n_feat - (self._ngramm - 1)
         return self._SumVec.type(t.float), self._add_cnt
 
-    def _circshift(self, dest, src, n):
-        self._lib.circshift_bv_bit(
-            self._ffi.cast('uint32_t * const', dest.data_ptr()),
-            self._ffi.cast('uint32_t * const', src.data_ptr()),
-            self._n_blk,
-            n
-        )
-
-    def _circshift_inplace(self, arr, n):
-        self._lib.circshift_inplace_bv_bit(
-            self._ffi.cast('uint32_t * const', arr.data_ptr()),
-            self._n_blk,
-            n
-        )
-
     def clip(self):
         '''
         Clip sum of ngramms to 1-bit values
@@ -169,21 +154,6 @@ class sng_encoder_ext_enc(hd_encoder):
 
         self._add_cnt = n_feat - (self._ngramm - 1)
         return self._SumVec.type(t.float), self._add_cnt
-
-    def _circshift(self, dest, src, n):
-        self._lib.circshift(
-            self._ffi.cast('int32_t * const', dest.data_ptr()),
-            self._ffi.cast('int32_t * const', src.data_ptr()),
-            self._D,
-            n
-        )
-
-    def _circshift_inplace(self, arr, n):
-        self._lib.circshift_inplace(
-            self._ffi.cast('int32_t * const', arr.data_ptr()),
-            self._D,
-            n
-        )
 
     def clip(self):
         '''
@@ -264,21 +234,6 @@ class sng_encoder_ext(hd_encoder):
         )
 
         return output
-
-    def _circshift(self, dest, src, n):
-        self._lib.circshift(
-            self._ffi.cast('int32_t * const', dest.data_ptr()),
-            self._ffi.cast('int32_t * const', src.data_ptr()),
-            self._D,
-            n
-        )
-
-    def _circshift_inplace(self, arr, n):
-        self._lib.circshift_inplace(
-            self._ffi.cast('int32_t * const', arr.data_ptr()),
-            self._D,
-            n
-        )
 
     def clip(self):
         '''
