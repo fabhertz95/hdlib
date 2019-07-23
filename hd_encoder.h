@@ -41,3 +41,7 @@ void ngrammencoding_string (
     int32_t * const data,
     const int n_data
 );
+
+void hd_encoder_clip(
+    struct hd_encoder_t * const p_state
+);

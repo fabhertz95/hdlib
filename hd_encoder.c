@@ -67,7 +67,6 @@ void hd_encoder_init(
         p_state->item_lookup[i] = rand() % 2;
 }
 
-
 // overall speedup ideas:
 // - perform circular shift locally, e.g. every 32 entries
 // - split HD vectors into blocks and encode large inputs in chunks, i.e.
@@ -142,4 +141,29 @@ void ngrammencoding_string (
         }
     }
 
+    p_state->encoder_count += n_data - (p_state->ngramm - 1);
+}
+
+void hd_encoder_clip(
+    struct hd_encoder_t * const p_state
+)
+{
+    // Add a random vector to break ties if case an odd number of elements were summed
+    if (p_state->encoder_count % 2 == 0)
+    {
+        for (int i = 0; i < p_state->d; i++)
+        {
+            p_state->encoder_buffer[i] += rand() % 2;
+        }
+        p_state->encoder_count++;
+    }
+
+    int threshold = p_state->encoder_count / 2;
+
+    for (int i = 0; i < p_state->d; i++)
+    {
+        // Set to 1 if above threshold and 0 otherwise
+        p_state->encoder_buffer[i] = ((uint32_t)(threshold - p_state->encoder_buffer[i])) >> 31;
+    }
+    p_state->encoder_count = 1;
 }

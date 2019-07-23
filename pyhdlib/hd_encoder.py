@@ -104,18 +104,6 @@ class sng_encoder_ext(hd_encoder):
     '''
 
     def __init__(self, D, nitem, ngramm):
-        self._D = D
-        self._ngramm = ngramm
-
-        # malloc for Ngramm block, ngramm result, and sum vector
-        self._block = t.Tensor(self._ngramm, self._D).type(t.int32)
-        self._Y = t.Tensor(self._D).type(t.int32)
-        self._SumVec = t.Tensor(self._D).type(t.int32)
-
-        self._add_cnt = 0
-
-        self._itemMemory = t.randint(0, 2, (nitem, D), dtype=t.int32)
-
         import cffi
         import os
         import platform
@@ -131,13 +119,17 @@ class sng_encoder_ext(hd_encoder):
         self._data = self._ffi.new('struct hd_encoder_t *')
         self._lib.hd_encoder_init(self._data, D, ngramm, nitem)
 
-        # item memory initialization
-        #self._data.item_lookup = t.randint(0, 2, (nitem, D), dtype=t.int32).data_ptr()
+        # overwrite the encoder summing buffer with a torch tensor's pointer
+        # this is so that the result can be communicated without copying
+        # TODO this will likely be unnecesary in the future
+        self._SumVec = t.Tensor(D).type(t.int32).contiguous()
+        self._data.encoder_buffer = self._ffi.cast('int32_t * const', self._SumVec.data_ptr())
 
-        # TODO: close self._lib
+        # TODO: release memory and close self._lib
 
     def encode(self, X):
         self._data.encoder_buffer = self._ffi.cast('int32_t * const', self._SumVec.data_ptr())
+        # TODO something breaks without the previous line
 
         # compute dimensionality
         n_samples, n_feat = X.shape
@@ -148,23 +140,14 @@ class sng_encoder_ext(hd_encoder):
             n_feat
         )
 
-        self._add_cnt = n_feat - (self._ngramm - 1)
-        return self._SumVec.type(t.float), self._add_cnt
+        return self._SumVec.type(t.float), self._data.encoder_count
 
     def clip(self):
-        '''
-        Clip sum of ngramms to 1-bit values
-        '''
-
-        # Add random vector to break ties
-        if self._add_cnt % 2 == 0:
-            self._SumVec.add_(t.randint(0, 2, (self._D,), dtype=t.int32))
-            self._add_cnt += 1
-
-        self._SumVec = (self._SumVec > (self._add_cnt / 2)).type(t.int32)
-        self._add_cnt = 1
-
-        return self._SumVec.type(t.float), self._add_cnt
+        self._lib.hd_encoder_clip(
+            self._data
+        )
+        
+        return self._SumVec.type(t.float), self._data.encoder_count
 
 
 class sng_encoder(hd_encoder):
