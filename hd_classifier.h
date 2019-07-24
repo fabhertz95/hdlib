@@ -8,16 +8,24 @@ struct hd_classifier_t
     // number of classes supported by hd_classifier
     int n_class;
 
-    // trained class vectors
+    // trained class vectors pre-clipping
     // shape: [n_class, d]
-    // TODO shape: [n_class, n_blk] and block_t
     uint32_t * am;
+    int * am_count; // TODO binding
+
+    // trained class vectors
+    // shape: [n_class, n_blk]
+    block_t * am_clipped;
 };
 
 void hd_classifier_init(
     struct hd_classifier_t * const state,
     const int n_blk,
     const int n_class
+);
+
+void hd_classifier_threshold(
+    const struct hd_classifier_t * const state
 );
 
 class_t hd_classifier_predict(

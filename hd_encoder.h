@@ -44,12 +44,19 @@ void hd_encoder_encode_ngramm(
     block_t * item
 );
 
+// encodes an array of features x (shape: [n_x])
+// and puts the result in state->ngramm_sum_buffer
 void hd_encoder_encode (
     struct hd_encoder_t * const state,
     const feature_t * const x,
     const int n_x
 );
 
+// thresholds the in buffer at half count,
+// and packs the output into the out buffer
 void hd_encoder_clip(
-    struct hd_encoder_t * const state
+    const uint32_t * const in,
+    const int n_in,
+    const int count,
+    block_t * const out
 );

@@ -183,8 +183,6 @@ void hd_encoder_encode_ngramm(
     }
 }
 
-// Encode an array of features x (shape: [n_x])
-// and put the result in state->ngramm_sum_buffer.
 void hd_encoder_encode (
     struct hd_encoder_t * const state,
     const feature_t * const x,
@@ -228,25 +226,34 @@ void hd_encoder_encode (
 
 // TODO call rand fewer times
 void hd_encoder_clip(
-    struct hd_encoder_t * const state
+    const uint32_t * const in,
+    const int n_in,
+    const int count,
+    block_t * const out
 )
 {
-    // add a random vector to break ties if case an odd number of elements were summed
-    if (state->ngramm_sum_count % 2 == 0)
+    int threshold = count / 2;
+
+    memset(out, 0, (n_in + sizeof(block_t) * 8 - 1) / (sizeof(block_t) * 8));
+
+    // add a random vector to break ties if case an even number of elements were summed
+    if (count % 2 == 0)
     {
-        for (int i = 0; i < sizeof(block_t) * 8 * state->n_blk; i++)
+        for (int i = 0; i < n_in; i++)
         {
-            state->ngramm_sum_buffer[i] += rand() % 2;
+            int in_with_rand = in[i] + rand() % 2;
+            out[i / 32] <<= 1;
+            // set to 1 if above threshold and 0 otherwise
+            out[i / 32] += ((uint32_t)(threshold - in_with_rand)) >> 31;
         }
-        state->ngramm_sum_count++;
+    }
+    else
+    {    
+        for (int i = 0; i < n_in; i++)
+        {
+            out[i / 32] <<= 1;
+            out[i / 32] += ((uint32_t)(threshold - in[i])) >> 31;
+        }
     }
 
-    int threshold = state->ngramm_sum_count / 2;
-
-    for (int i = 0; i < sizeof(block_t) * 8 * state->n_blk; i++)
-    {
-        // set to 1 if above threshold and 0 otherwise
-        state->ngramm_sum_buffer[i] = ((uint32_t)(threshold - state->ngramm_sum_buffer[i])) >> 31;
-    }
-    state->ngramm_sum_count = 1;
 }

@@ -13,7 +13,23 @@ void hd_classifier_init(
 {
     state->n_blk = n_blk;
     state->n_class = n_class;
-    // state->am = malloc(n_class * n_blk * sizeof(block_t));
+    // am and am_count are not initialised, they are set externally
+    state->am_clipped = malloc(n_class * n_blk * sizeof(block_t));
+}
+
+void hd_classifier_threshold(
+    const struct hd_classifier_t * const state
+)
+{
+    for (class_t class = 0; class < state->n_class; class++)
+    {
+        hd_encoder_clip(
+            state->am + class * state->n_blk * sizeof(block_t) * 8,
+            state->n_blk * sizeof(block_t) * 8,
+            state->am_count[class],
+            state->am_clipped + class * state->n_blk
+        );
+    }
 }
 
 class_t hd_classifier_predict(
@@ -24,20 +40,23 @@ class_t hd_classifier_predict(
 )
 {
     hd_encoder_encode(encoder_state, x, n_x);
-    hd_encoder_clip(encoder_state);
+    // TODO: move rename hd_encoder_clip to clip
+    // and implement this call as hd_encoder_clip
+    hd_encoder_clip(
+        encoder_state->ngramm_sum_buffer,
+        sizeof(block_t) * 8 * encoder_state->n_blk,
+        encoder_state->ngramm_sum_count,
+        encoder_state->ngramm_buffer
+    );
 
     int best_score = INT_MAX;
     class_t best_class;
     for (class_t class = 0; class < state->n_class; class++)
     {
-        // TODO: move encoder output to a separate output buffer
-        // or to ngramm_buffer when clip packing is implemented
         int score = hamming_distance(
-            encoder_state->ngramm_sum_buffer,
-            // TODO: remove " * sizeof(block_t) * 8" when packing is implemented
-            state->am + class * state->n_blk * sizeof(block_t) * 8,
-            // TODO: remove " * sizeof(block_t) * 8" when packing is implemented
-            state->n_blk * sizeof(block_t) * 8 * sizeof(state->am[0])
+            encoder_state->ngramm_buffer,
+            state->am_clipped + class * state->n_blk,
+            state->n_blk * sizeof(state->am_clipped[0])
         );
 
         if (score < best_score)

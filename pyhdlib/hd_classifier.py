@@ -59,9 +59,6 @@ class hd_classifier_ext():
         # TODO: release memory and close self._lib
 
     def encode(self, X):
-        self._encoder.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
-        # TODO something breaks without the previous line
-
         # compute dimensionality
         n_samples, n_feat = X.shape
 
@@ -70,12 +67,6 @@ class hd_classifier_ext():
             self._ffi.cast('const feature_t * const', X.data_ptr()),
             n_feat
         )
-
-    def clip(self):
-        self._lib.hd_encoder_clip(
-            self._encoder
-        )
-
 
     def save(self):
         pass # TODO
@@ -91,6 +82,7 @@ class hd_classifier_ext():
         self._classifier = self._ffi.new('struct hd_classifier_t *')
         self._lib.hd_classifier_init(self._classifier, self._encoder.n_blk, n_classes)
         self._classifier.am = self._ffi.cast('block_t *', self._am.data_ptr())
+        self._classifier.am_count = self._ffi.cast('int *', self._cnt.data_ptr())
 
         return
 
@@ -123,17 +115,7 @@ class hd_classifier_ext():
         return
 
     def am_threshold(self):
-        '''
-        Threshold AM
-        '''
-        # Thresholding
-        for y_s in range(self._n_classes):
-            # break ties randomly by adding random vector to
-            if self._cnt[y_s] % 2 == 0:
-                self._am[y_s].add_(t.randint(0, 2, (self._D,), dtype=t.int32))  # add random vector
-                self._cnt[y_s] += 1
-            self._am[y_s] = self._am[y_s] > int(self._cnt[y_s] / 2)
-        return
+        self._lib.hd_classifier_threshold(self._classifier)
 
     def fit(self, X, y):
         '''
@@ -186,12 +168,6 @@ class hd_classifier_ext():
             )
 
         return dec_values.numpy()
-
-    def hamming_distance(self, X1, X2):
-        a = self._ffi.cast('const void * const', X1.data_ptr())
-        b = self._ffi.cast('const void * const', X2.data_ptr())
-        n = X1.shape[0] * 4
-        return self._lib.hamming_distance(a, b, n)
 
 
 class hd_classifier(am_classifier):
