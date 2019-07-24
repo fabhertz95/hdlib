@@ -12,7 +12,7 @@ import numpy as np
 import cloudpickle as cpckl
 
 
-from hd_encoder import sng_encoder, sng_encoder_ext
+from hd_encoder import sng_encoder
 from am_classifier import am_classifier
 
 
