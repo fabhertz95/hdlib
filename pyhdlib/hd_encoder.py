@@ -41,7 +41,7 @@ class sng_encoder_ext(hd_encoder):
         self._ffi = cffi.FFI()
         self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
         self._lib = self._ffi.dlopen(
-            os.path.join(path, f'hd_encoder_{platform.machine()}.so')
+            os.path.join(path, f'hdlib_{platform.machine()}.so')
         )
 
         self._data = self._ffi.new('struct hd_encoder_t *')
