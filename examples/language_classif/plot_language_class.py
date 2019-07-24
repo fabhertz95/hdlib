@@ -18,7 +18,7 @@ import numpy as np
 sys.path.append('../../pyhdlib/')
 
 from load_data import load_data
-from hd_classifier import hd_classifier, bin2int
+from hd_classifier import hd_classifier_ext, bin2int
 
 training = True
 testing = True
@@ -37,7 +37,8 @@ device = 'cuda:0'
 name = 'data/models/' + str(ngramm) + 'gramm'
 
 
-hd = hd_classifier(D, encoding, device, nitem, ngramm, name=name)
+#hd = hd_classifier(D, encoding, device, nitem, ngramm, name=name)
+hd = hd_classifier_ext(D, nitem, ngramm)
 
 
 ########################## training ########################################
