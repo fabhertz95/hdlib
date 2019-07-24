@@ -38,13 +38,17 @@ class hd_classifier_ext():
         path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
 
         self._ffi = cffi.FFI()
-        self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
+        self._ffi.cdef('\n'.join([
+            open(os.path.join(path, 'hd_encoder.h'), 'r').read(),
+            open(os.path.join(path, 'hd_classifier.h'), 'r').read()
+        ]))
         self._lib = self._ffi.dlopen(
             os.path.join(path, f'hdlib_{platform.machine()}.so')
         )
 
         self._encoder = self._ffi.new('struct hd_encoder_t *')
         self._lib.hd_encoder_init(self._encoder, n_blk, ngramm, nitem)
+        self._lib.hamming_distance_init()
 
         # overwrite the encoder summing buffer with a torch tensor's pointer
         # this is so that the result can be communicated without copying
@@ -190,26 +194,10 @@ class hd_classifier_ext():
         return dec_values.cpu().numpy()
 
     def hamming_distance(self, X1, X2):
-        '''
-        Calculate Hamming distance
-
-        Parameters
-        ----------
-        X1: torch tensor, size = [_D,]
-                Input 1
-        X2: torch tensor, size = [_D,]
-                Input 2
-
-        Returns
-        -------
-        hdist : torch tensor, size = [1]
-                normalized hamming distance
-        '''
-        D = X1.shape[0]
-
-        cossim = t.mm((2 * X1.type(t.FloatTensor) - 1).view(1, -1), (2 * X2.type(t.FloatTensor) - 1).view(-1, 1))[0] / float(D)
-
-        return (1 - cossim) / 2
+        a = self._ffi.cast('const void * const', X1.data_ptr())
+        b = self._ffi.cast('const void * const', X2.data_ptr())
+        n = X1.shape[0] * 4
+        return self._lib.hamming_distance(a, b, n)
 
 
 class hd_classifier(am_classifier):
