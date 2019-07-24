@@ -1,3 +1,10 @@
+// TODO: use uint8_t for feature_t
+// input vector feature
+typedef uint32_t feature_t;
+
+// packed HD vector block
+typedef uint32_t block_t;
+
 struct hd_encoder_t
 {
     // HD vector length
@@ -8,7 +15,7 @@ struct hd_encoder_t
 
     // encoded n-gramm buffer
     // shape: [n_blk]
-    uint32_t * ngramm_buffer;
+    block_t * ngramm_buffer;
 
     // encoded n-gramm summation buffer
     // shape: [n_blk * 32]
@@ -17,12 +24,12 @@ struct hd_encoder_t
 
     // HD vector n-gramm circular buffer (head: last copied item)
     // shape: [ngramm, n_blk]
-    uint32_t * item_buffer;
+    block_t * item_buffer;
     int item_buffer_head;
 
     // HD vector lookup table
     // shape: [n_items, n_blk]
-    uint32_t * item_lookup;
+    block_t * item_lookup;
 };
 
 void hd_encoder_init(
@@ -34,13 +41,13 @@ void hd_encoder_init(
 
 void hd_encoder_encode_ngramm(
     struct hd_encoder_t * const state,
-    uint32_t * item
+    block_t * item
 );
 
 void hd_encoder_encode (
     struct hd_encoder_t * const state,
-    uint32_t * const data,
-    const int n_data
+    const feature_t * const x,
+    const int n_x
 );
 
 void hd_encoder_clip(

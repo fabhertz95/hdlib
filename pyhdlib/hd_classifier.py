@@ -67,7 +67,7 @@ class hd_classifier_ext():
 
         self._lib.hd_encoder_encode(
             self._encoder,
-            self._ffi.cast('uint32_t * const', X.data_ptr()),
+            self._ffi.cast('const feature_t * const', X.data_ptr()),
             n_feat
         )
 
