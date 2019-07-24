@@ -26,23 +26,23 @@ struct hd_encoder_t
 };
 
 void hd_encoder_init(
-    struct hd_encoder_t * const p_state,
+    struct hd_encoder_t * const state,
     const int n_blk,
     const int ngramm,
     const int n_items
 );
 
 void hd_encoder_encode_ngramm(
-    struct hd_encoder_t * const p_state,
+    struct hd_encoder_t * const state,
     uint32_t * item
 );
 
 void hd_encoder_encode (
-    struct hd_encoder_t * const p_state,
+    struct hd_encoder_t * const state,
     uint32_t * const data,
     const int n_data
 );
 
 void hd_encoder_clip(
-    struct hd_encoder_t * const p_state
+    struct hd_encoder_t * const state
 );

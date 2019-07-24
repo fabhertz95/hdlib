@@ -7,6 +7,8 @@
 // Choose type of shift used. Possibilities: CIRCSHIFT_NAIVE, CIRCSHIFT_WORD, CIRCSHIFT_BIT
 #define CIRCSHIFT_WORD
 
+// TODO: optimise shifts by always shifting by 1 to the right?
+
 void circshift_naive(uint32_t * const arr, const int n_blk, const int n)
 {
     if (n > 0)
@@ -100,24 +102,24 @@ void circshift(uint32_t * const arr, const int n_blk, const int n)
 
 
 void hd_encoder_init(
-    struct hd_encoder_t * const p_state,
+    struct hd_encoder_t * const state,
     const int n_blk,
     const int ngramm,
     const int n_items
 )
 {
-    p_state->n_blk = n_blk;
-    p_state->ngramm = ngramm;
-    p_state->ngramm_buffer = malloc(n_blk * sizeof(uint32_t));
-    p_state->ngramm_sum_buffer = malloc(n_blk * 32 * sizeof(uint32_t));
-    p_state->item_buffer = malloc(ngramm * n_blk * sizeof(uint32_t));
-    p_state->item_buffer_head = 0;
-    p_state->item_lookup = malloc(n_items * n_blk * sizeof(uint32_t));
+    state->n_blk = n_blk;
+    state->ngramm = ngramm;
+    state->ngramm_buffer = malloc(n_blk * sizeof(uint32_t));
+    state->ngramm_sum_buffer = malloc(n_blk * 32 * sizeof(uint32_t));
+    state->item_buffer = malloc(ngramm * n_blk * sizeof(uint32_t));
+    state->item_buffer_head = 0;
+    state->item_lookup = malloc(n_items * n_blk * sizeof(uint32_t));
 
     // initialise HD vector lookup table with uniformly distributed 0s and 1s
     for (int i = 0; i < n_items * n_blk; ++i)
     {
-        p_state->item_lookup[i] = 0;
+        state->item_lookup[i] = 0;
 
         // rand() generates a random number between 0 and RAND_MAX, which is
         // guaranteed to be no less than 32767 on any standard implementation.
@@ -129,10 +131,10 @@ void hd_encoder_init(
         #define RAND_BYTES 1
         #endif
 
-        for (int j = 0; j < sizeof(p_state->item_lookup[0]) / RAND_BYTES; j++)
+        for (int j = 0; j < sizeof(state->item_lookup[0]) / RAND_BYTES; j++)
         {
-            p_state->item_lookup[i] <<= 8 * RAND_BYTES;
-            p_state->item_lookup[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
+            state->item_lookup[i] <<= 8 * RAND_BYTES;
+            state->item_lookup[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
         }
     }
 }
@@ -143,15 +145,15 @@ void hd_encoder_init(
 //   for D=10000 encode the whole input using first 1000 vector elements,
 //   than next 1000 etc.
 void hd_encoder_encode_ngramm(
-    struct hd_encoder_t * const p_state,
+    struct hd_encoder_t * const state,
     uint32_t * const item
 )
 {
-    const int n_blk = p_state->n_blk;
-    const int ngramm = p_state->ngramm;
-    uint32_t * buf = p_state->item_buffer;
+    const int n_blk = state->n_blk;
+    const int ngramm = state->ngramm;
+    uint32_t * buf = state->item_buffer;
 
-    int *p_head = &p_state->item_buffer_head;
+    int *p_head = &state->item_buffer_head;
 
     // advance item circular buffer head
     *p_head = (*p_head + 1) % ngramm;
@@ -166,13 +168,13 @@ void hd_encoder_encode_ngramm(
     }
 
     // write new first entry
-    memcpy(buf + n_blk * p_state->item_buffer_head, item, n_blk * sizeof buf[0]);
+    memcpy(buf + n_blk * state->item_buffer_head, item, n_blk * sizeof buf[0]);
 
     // calculate n-gramm of all items
-    memcpy(p_state->ngramm_buffer, buf, n_blk * sizeof buf[0]);
+    memcpy(state->ngramm_buffer, buf, n_blk * sizeof buf[0]);
     for (int i = 1; i != ngramm; i++)
     {
-        uint32_t * output_iter = p_state->ngramm_buffer;
+        uint32_t * output_iter = state->ngramm_buffer;
         uint32_t * buf_iter = buf + (i * n_blk);
         for (int j = 0; j < n_blk; j++)
         {
@@ -181,67 +183,70 @@ void hd_encoder_encode_ngramm(
     }
 }
 
+// Encode an array of features x (shape: [n_x])
+// and put the result in state->ngramm_sum_buffer.
 void hd_encoder_encode (
-    struct hd_encoder_t * const p_state,
-    uint32_t * const data,
-    const int n_data
+    struct hd_encoder_t * const state,
+    uint32_t * const x,
+    const int n_x
 )
 {
-    const int n_blk = p_state->n_blk;
-    const int ngramm = p_state->ngramm;
+    const int n_blk = state->n_blk;
+    const int ngramm = state->ngramm;
 
-    memset(p_state->ngramm_sum_buffer, 0, 32 * n_blk * sizeof(p_state->ngramm_sum_buffer[0]));
-    p_state->ngramm_sum_count = 0;
+    memset(state->ngramm_sum_buffer, 0, 32 * n_blk * sizeof(state->ngramm_sum_buffer[0]));
+    state->ngramm_sum_count = 0;
 
-    memset(p_state->item_buffer, 0, n_blk * p_state->ngramm * sizeof(p_state->ngramm_sum_buffer[0]));
+    memset(state->item_buffer, 0, n_blk * state->ngramm * sizeof(state->ngramm_sum_buffer[0]));
 
-    // loop over every feature (character of the text)
-    for (int feat_idx = 0; feat_idx < n_data; feat_idx++) {
-        // get position of item in itemMemory for current feature (character)
-        uint32_t char_idx = data[feat_idx];
+    // loop over every feature (indexed character of the text)
+    for (int feat_idx = 0; feat_idx < n_x; feat_idx++) {
+        // get position of item in itemMemory for current feature (indexed character)
+        uint32_t item_lookup_idx = x[feat_idx];
 
         // get pointer to item
-        uint32_t * p_item = p_state->item_lookup + (char_idx) * n_blk;
+        uint32_t * item = state->item_lookup + item_lookup_idx * n_blk;
 
         // do ngrammencoding, store temporary result in output
-        hd_encoder_encode_ngramm(p_state, p_item);
+        hd_encoder_encode_ngramm(state, item);
 
         if (feat_idx >= ngramm - 1) {
             // add temporary output to sumVec
-            uint32_t * p_sumVec = p_state->ngramm_sum_buffer;
-            uint32_t * p_tmp_ngramm = p_state->ngramm_buffer;
+            uint32_t * ngramm_sum_buffer_iter = state->ngramm_sum_buffer;
+            uint32_t * ngramm_buffer_iter = state->ngramm_buffer;
             for (int i = 0; i < n_blk; i++) {
                 for (int j = 0; j < 32; j++) {
-                    *p_sumVec++ += ((*p_tmp_ngramm) >> j) & 1;
+                    *ngramm_sum_buffer_iter++ += ((*ngramm_buffer_iter) >> j) & 1;
                 }
-                p_tmp_ngramm++;
+                ngramm_buffer_iter++;
             }
         }
     }
 
-    p_state->ngramm_sum_count += n_data - (p_state->ngramm - 1);
+    state->ngramm_sum_count += n_x - (state->ngramm - 1);
 }
 
+// TODO call rand fewer times
 void hd_encoder_clip(
-    struct hd_encoder_t * const p_state
+    struct hd_encoder_t * const state
 )
 {
     // add a random vector to break ties if case an odd number of elements were summed
-    if (p_state->ngramm_sum_count % 2 == 0)
+    if (state->ngramm_sum_count % 2 == 0)
     {
-        for (int i = 0; i < 32 * p_state->n_blk; i++)
+        for (int i = 0; i < 32 * state->n_blk; i++)
         {
-            p_state->ngramm_sum_buffer[i] += rand() % 2;
+            state->ngramm_sum_buffer[i] += rand() % 2;
         }
-        p_state->ngramm_sum_count++;
+        state->ngramm_sum_count++;
     }
 
-    int threshold = p_state->ngramm_sum_count / 2;
+    int threshold = state->ngramm_sum_count / 2;
 
-    for (int i = 0; i < 32 * p_state->n_blk; i++)
+    for (int i = 0; i < 32 * state->n_blk; i++)
     {
         // set to 1 if above threshold and 0 otherwise
-        p_state->ngramm_sum_buffer[i] = ((uint32_t)(threshold - p_state->ngramm_sum_buffer[i])) >> 31;
+        state->ngramm_sum_buffer[i] = ((uint32_t)(threshold - state->ngramm_sum_buffer[i])) >> 31;
     }
-    p_state->ngramm_sum_count = 1;
+    state->ngramm_sum_count = 1;
 }
