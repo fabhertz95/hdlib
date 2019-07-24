@@ -67,14 +67,10 @@ class hd_classifier_ext():
             n_feat
         )
 
-        return self._ngramm_sum_buffer.type(t.float), self._encoder.ngramm_sum_count
-
     def clip(self):
         self._lib.hd_encoder_clip(
             self._encoder
         )
-        
-        return self._ngramm_sum_buffer.type(t.float), self._encoder.ngramm_sum_count
 
 
     def save(self):
@@ -92,8 +88,8 @@ class hd_classifier_ext():
         n_classes:
         '''
         self._n_classes = n_classes
-        self._am = t.Tensor(self._n_classes, self._D).zero_()
-        self._cnt = t.Tensor(self._n_classes).zero_()
+        self._am = t.Tensor(self._n_classes, self._D).type(t.int32).zero_()
+        self._cnt = t.Tensor(self._n_classes).type(t.int32).zero_()
 
         return
 
@@ -116,9 +112,9 @@ class hd_classifier_ext():
         for sample in range(n_samples):
             y_s = y[sample]
             if (y_s < self._n_classes) and (y_s >= 0):
-                enc_vec, n_add = self.encode(X[sample].view(1, -1))
-                self._am[y_s].add_(enc_vec)
-                self._cnt[y_s] += n_add
+                self.encode(X[sample].view(1, -1))
+                self._am[y_s].add_(self._ngramm_sum_buffer)
+                self._cnt[y_s] += self._encoder.ngramm_sum_count
             else:
                 raise ValueError("Label is not in range of [{:},{:}], got {:}".format(
                     0, self._n_classes, y_s))
@@ -133,8 +129,7 @@ class hd_classifier_ext():
         for y_s in range(self._n_classes):
             # break ties randomly by adding random vector to
             if self._cnt[y_s] % 2 == 0:
-                self._am[y_s].add_(t.randint(0, 2, (self._D,)).type(
-                    t.FloatTensor))  # add random vector
+                self._am[y_s].add_(t.randint(0, 2, (self._D,), dtype=t.int32))  # add random vector
                 self._cnt[y_s] += 1
             self._am[y_s] = self._am[y_s] > int(self._cnt[y_s] / 2)
         return
@@ -185,11 +180,10 @@ class hd_classifier_ext():
         for sample in range(n_samples):
             # encode samples
             self.encode(X[sample].view(1, -1))
-            enc_vec, _ = self.clip()
+            self.clip()
             # calculate hamming distance for every class
             for y_s in range(self._n_classes):
-                hd_dist[sample, y_s] = self.hamming_distance(
-                    enc_vec, self._am[y_s])
+                hd_dist[sample, y_s] = self.hamming_distance(self._ngramm_sum_buffer, self._am[y_s])
 
             dec_values[sample] = t.argmin(hd_dist[sample])
 
@@ -213,7 +207,7 @@ class hd_classifier_ext():
         '''
         D = X1.shape[0]
 
-        cossim = t.mm((2 * X1 - 1).view(1, -1), (2 * X2 - 1).view(-1, 1))[0] / float(D)
+        cossim = t.mm((2 * X1.type(t.FloatTensor) - 1).view(1, -1), (2 * X2.type(t.FloatTensor) - 1).view(-1, 1))[0] / float(D)
 
         return (1 - cossim) / 2
 
