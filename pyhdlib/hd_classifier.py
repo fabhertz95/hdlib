@@ -84,16 +84,13 @@ class hd_classifier_ext():
         pass # TODO
 
     def am_init(self, n_classes):
-        '''
-        Train AM
-
-        Parameters
-        ----------
-        n_classes:
-        '''
         self._n_classes = n_classes
         self._am = t.Tensor(self._n_classes, self._D).type(t.int32).zero_()
         self._cnt = t.Tensor(self._n_classes).type(t.int32).zero_()
+
+        self._classifier = self._ffi.new('struct hd_classifier_t *')
+        self._lib.hd_classifier_init(self._classifier, self._encoder.n_blk, n_classes)
+        self._classifier.am = self._ffi.cast('block_t *', self._am.data_ptr())
 
         return
 
@@ -179,19 +176,16 @@ class hd_classifier_ext():
         X = t.from_numpy(X).type(t.int32)
         n_samples = X.shape[0]
         dec_values = t.Tensor(n_samples)
-        hd_dist = t.Tensor(n_samples, self._n_classes).zero_()
 
         for sample in range(n_samples):
-            # encode samples
-            self.encode(X[sample].view(1, -1))
-            self.clip()
-            # calculate hamming distance for every class
-            for y_s in range(self._n_classes):
-                hd_dist[sample, y_s] = self.hamming_distance(self._ngramm_sum_buffer, self._am[y_s])
+            dec_values[sample] = self._lib.hd_classifier_predict(
+                self._classifier,
+                self._encoder,
+                self._ffi.cast('const feature_t * const', X[sample].data_ptr()),
+                X[sample].shape[0]
+            )
 
-            dec_values[sample] = t.argmin(hd_dist[sample])
-
-        return dec_values.cpu().numpy()
+        return dec_values.numpy()
 
     def hamming_distance(self, X1, X2):
         a = self._ffi.cast('const void * const', X1.data_ptr())

@@ -1,6 +1,6 @@
 // TODO: use uint8_t for feature_t
 // input vector feature
-typedef uint32_t feature_t;
+typedef int32_t feature_t;
 
 // packed HD vector block
 typedef uint32_t block_t;
