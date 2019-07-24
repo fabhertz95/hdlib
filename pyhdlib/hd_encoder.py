@@ -108,8 +108,11 @@ class sng_encoder_ext(hd_encoder):
         import os
         import platform
 
+        n_blk = int(D / 32)
+        D = n_blk * 32
+
         path = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
-        
+
         self._ffi = cffi.FFI()
         self._ffi.cdef(open(os.path.join(path, 'hd_encoder.h'), 'r').read())
         self._lib = self._ffi.dlopen(
@@ -117,18 +120,18 @@ class sng_encoder_ext(hd_encoder):
         )
 
         self._data = self._ffi.new('struct hd_encoder_t *')
-        self._lib.hd_encoder_init(self._data, D, ngramm, nitem)
+        self._lib.hd_encoder_init(self._data, n_blk, ngramm, nitem)
 
         # overwrite the encoder summing buffer with a torch tensor's pointer
         # this is so that the result can be communicated without copying
         # TODO this will likely be unnecesary in the future
         self._ngramm_sum_buffer = t.Tensor(D).type(t.int32).contiguous()
-        self._data.ngramm_sum_buffer = self._ffi.cast('int32_t * const', self._ngramm_sum_buffer.data_ptr())
+        self._data.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
 
         # TODO: release memory and close self._lib
 
     def encode(self, X):
-        self._data.ngramm_sum_buffer = self._ffi.cast('int32_t * const', self._ngramm_sum_buffer.data_ptr())
+        self._data.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
         # TODO something breaks without the previous line
 
         # compute dimensionality
@@ -136,7 +139,7 @@ class sng_encoder_ext(hd_encoder):
 
         self._lib.hd_encoder_encode(
             self._data,
-            self._ffi.cast('int32_t * const', X.data_ptr()),
+            self._ffi.cast('uint32_t * const', X.data_ptr()),
             n_feat
         )
 
