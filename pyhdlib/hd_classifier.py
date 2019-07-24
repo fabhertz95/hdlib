@@ -54,21 +54,25 @@ class hd_classifier(am_classifier):
 
             super().__init__(D, _encoder, _device)
 
+    # TODO: loading and saving are temporarily disabled
+    # because they don't seem to work with CFFI
     def save(self):
         '''
         save class as self.name.txt
         '''
-        file = open(self._name + '.txt', 'wb')
-        cpckl.dump(self.__dict__, file)
-        file.close()
+        # file = open(self._name + '.txt', 'wb')
+        # cpckl.dump(self.__dict__, file)
+        # file.close()
+        pass
 
     def load(self):
         '''
         try load self._name.txt
         '''
-        file = open(self._name + '.txt', 'rb')
+        # file = open(self._name + '.txt', 'rb')
 
-        self.__dict__ = cpckl.load(file)
+        # self.__dict__ = cpckl.load(file)
+        raise
 
     def save2binary_model(self):
         '''
