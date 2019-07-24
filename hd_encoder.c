@@ -116,10 +116,25 @@ void hd_encoder_init(
 
     // initialise HD vector lookup table with uniformly distributed 0s and 1s
     for (int i = 0; i < n_items * n_blk; ++i)
-        // TODO RAND_MAX may be lower than 1<<32 (on my libux laptop, it is 1<<31).
-        // By computing two random numbers, and using their 16 lowest bits, I think
-        // this function remains portable.
-        p_state->item_lookup[i] = ((rand() % (1<<16)) << 16) + (rand() % (1<<16));
+    {
+        p_state->item_lookup[i] = 0;
+
+        // rand() generates a random number between 0 and RAND_MAX, which is
+        // guaranteed to be no less than 32767 on any standard implementation.
+        #if (RAND_MAX >= (1u << 32) - 1u)
+        #define RAND_BYTES 4
+        #elif (RAND_MAX >= (1u << 16) - 1u)
+        #define RAND_BYTES 2
+        #elif (RAND_MAX >= (1u << 8) - 1u)
+        #define RAND_BYTES 1
+        #endif
+
+        for (int j = 0; j < sizeof(p_state->item_lookup[0]) / RAND_BYTES; j++)
+        {
+            p_state->item_lookup[i] <<= 8 * RAND_BYTES;
+            p_state->item_lookup[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
+        }
+    }
 }
 
 // overall speedup ideas:
@@ -127,7 +142,6 @@ void hd_encoder_init(
 // - split HD vectors into blocks and encode large inputs in chunks, i.e.
 //   for D=10000 encode the whole input using first 1000 vector elements,
 //   than next 1000 etc.
-// - binary HD vectors
 void hd_encoder_encode_ngramm(
     struct hd_encoder_t * const p_state,
     uint32_t * const item
@@ -165,7 +179,6 @@ void hd_encoder_encode_ngramm(
             *output_iter++ ^= *buf_iter++;
         }
     }
-
 }
 
 void hd_encoder_encode (
