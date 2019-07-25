@@ -65,6 +65,7 @@ class hd_classifier_ext():
         self._n_classes = self._classifier.n_class
 
         # prepare data for interaction
+        # TODO this will likely be unnecesary in the future (see same lines in am_init)
         self._ngramm_sum_buffer = t.Tensor(self._encoder.n_blk * 32).type(t.int32).contiguous()
         self._encoder.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
 
@@ -89,13 +90,13 @@ class hd_classifier_ext():
 
         # setup classifier
         self._n_classes = n_classes
-        self._am = t.Tensor(self._n_classes, self._D).type(t.int32).zero_()
-        self._cnt = t.Tensor(self._n_classes).type(t.int32).zero_()
+        self._class_vec_sum = t.Tensor(self._n_classes, self._D).type(t.int32).zero_()
+        self._class_vec_cnt = t.Tensor(self._n_classes).type(t.int32).zero_()
 
         self._classifier = self._ffi.new('struct hd_classifier_t *')
         self._lib.hd_classifier_init(self._classifier, self._encoder.n_blk, n_classes)
-        self._classifier.am = self._ffi.cast('block_t *', self._am.data_ptr())
-        self._classifier.am_count = self._ffi.cast('int *', self._cnt.data_ptr())
+        self._classifier.class_vec_sum = self._ffi.cast('block_t *', self._class_vec_sum.data_ptr())
+        self._classifier.class_vec_cnt = self._ffi.cast('int *', self._class_vec_cnt.data_ptr())
 
         # TODO: release memory and close self._lib
 
@@ -119,8 +120,8 @@ class hd_classifier_ext():
             y_s = y[sample]
             if (y_s < self._n_classes) and (y_s >= 0):
                 self.encode(X[sample].view(1, -1))
-                self._am[y_s].add_(self._ngramm_sum_buffer)
-                self._cnt[y_s] += self._encoder.ngramm_sum_count
+                self._class_vec_sum[y_s].add_(self._ngramm_sum_buffer)
+                self._class_vec_cnt[y_s] += self._encoder.ngramm_sum_count
             else:
                 raise ValueError("Label is not in range of [{:},{:}], got {:}".format(
                     0, self._n_classes, y_s))

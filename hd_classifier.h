@@ -10,12 +10,12 @@ struct hd_classifier_t
 
     // trained class vectors pre-clipping
     // shape: [n_class, d]
-    uint32_t * am;
-    int * am_count; // TODO binding
+    uint32_t * class_vec_sum;
+    int * class_vec_cnt; // TODO binding
 
     // trained class vectors
     // shape: [n_class, n_blk]
-    block_t * am_clipped;
+    block_t * class_vec;
 };
 
 void hd_classifier_init(

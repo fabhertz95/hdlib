@@ -14,8 +14,8 @@ void hd_classifier_init(
 {
     state->n_blk = n_blk;
     state->n_class = n_class;
-    // am and am_count are not initialised, they are set externally
-    state->am_clipped = malloc(n_class * n_blk * sizeof(block_t));
+    // class_vec_sum and class_vec_cnt are not initialised, they are set externally
+    state->class_vec = malloc(n_class * n_blk * sizeof(block_t));
 }
 
 void hd_classifier_threshold(
@@ -25,10 +25,10 @@ void hd_classifier_threshold(
     for (class_t class = 0; class < state->n_class; class++)
     {
         hd_encoder_clip(
-            state->am + class * state->n_blk * sizeof(block_t) * 8,
+            state->class_vec_sum + class * state->n_blk * sizeof(block_t) * 8,
             state->n_blk * sizeof(block_t) * 8,
-            state->am_count[class],
-            state->am_clipped + class * state->n_blk
+            state->class_vec_cnt[class],
+            state->class_vec + class * state->n_blk
         );
     }
 }
@@ -56,8 +56,8 @@ class_t hd_classifier_predict(
     {
         int score = hamming_distance(
             encoder_state->ngramm_buffer,
-            state->am_clipped + class * state->n_blk,
-            state->n_blk * sizeof(state->am_clipped[0])
+            state->class_vec + class * state->n_blk,
+            state->n_blk * sizeof(state->class_vec[0])
         );
 
         if (score < best_score)
@@ -119,7 +119,7 @@ void save(
     fwrite(&(s_enc->n_items), sizeof(s_enc->n_items), 1, fp);
 
     // write trained language vectors
-    fwrite(s_classif->am_clipped, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
+    fwrite(s_classif->class_vec, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
 
     // write item_lookup
     fwrite(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
@@ -159,7 +159,7 @@ int load(
     // TODO This line above also initializes the item lookup!
 
     // read the trained language vectors
-    bytes_read += fread(s_classif->am_clipped, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
+    bytes_read += fread(s_classif->class_vec, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
 
     // read item_lookup
     bytes_read += fread(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
