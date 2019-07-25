@@ -38,13 +38,14 @@ name = 'data/models/' + str(ngramm) + 'gramm'
 
 
 #hd = hd_classifier(D, encoding, device, nitem, ngramm, name=name)
-hd = hd_classifier_ext(D, nitem, ngramm)
+hd = hd_classifier_ext()
 
 
 ########################## training ########################################
 
 if training:
-    hd.am_init(dl._n_labels)
+    #hd.am_init(dl._n_labels)
+    hd.am_init(D, nitem, ngramm, dl._n_labels)
     label = 0
 
     while (label != -1):

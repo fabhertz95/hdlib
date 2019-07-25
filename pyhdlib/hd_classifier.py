@@ -22,14 +22,7 @@ __date__ = "17.5.2019"
 
 
 class hd_classifier_ext():
-    def __init__(self, D, nitem, ngramm=3):
-
-        # round D up to the nearest multiple of 32
-        n_blk = int((D + 31) / 32)
-        if D != n_blk * 32:
-            print(f"Dimensionality given which is not a multiple of 32! Using {n_blk * 32} instead")
-        D = n_blk * 32
-        self._D = D
+    def __init__(self):
 
         import cffi
         import os
@@ -45,18 +38,6 @@ class hd_classifier_ext():
         self._lib = self._ffi.dlopen(
             os.path.join(path, f'hdlib_{platform.machine()}.so')
         )
-
-        self._encoder = self._ffi.new('struct hd_encoder_t *')
-        self._lib.hd_encoder_init(self._encoder, n_blk, ngramm, nitem)
-        self._lib.hamming_distance_init()
-
-        # overwrite the encoder summing buffer with a torch tensor's pointer
-        # this is so that the result can be communicated without copying
-        # TODO this will likely be unnecesary in the future
-        self._ngramm_sum_buffer = t.Tensor(D).type(t.int32).contiguous()
-        self._encoder.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
-
-        # TODO: release memory and close self._lib
 
     def encode(self, X):
         # compute dimensionality
@@ -74,7 +55,26 @@ class hd_classifier_ext():
     def load(self):
         pass # TODO
 
-    def am_init(self, n_classes):
+    def am_init(self, D, nitem, n_classes, ngramm=3):
+        # round D up to the nearest multiple of 32
+        n_blk = int((D + 31) / 32)
+        if D != n_blk * 32:
+            print(f"Dimensionality given which is not a multiple of 32! Using {n_blk * 32} instead")
+        D = n_blk * 32
+
+        self._D = D
+
+        # setup encoder
+        self._encoder = self._ffi.new('struct hd_encoder_t *')
+        self._lib.hd_encoder_init(self._encoder, n_blk, ngramm, nitem)
+        self._lib.hamming_distance_init()
+        # overwrite the encoder summing buffer with a torch tensor's pointer
+        # this is so that the result can be communicated without copying
+        # TODO this will likely be unnecesary in the future
+        self._ngramm_sum_buffer = t.Tensor(D).type(t.int32).contiguous()
+        self._encoder.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
+
+        # setup classifier
         self._n_classes = n_classes
         self._am = t.Tensor(self._n_classes, self._D).type(t.int32).zero_()
         self._cnt = t.Tensor(self._n_classes).type(t.int32).zero_()
@@ -84,7 +84,7 @@ class hd_classifier_ext():
         self._classifier.am = self._ffi.cast('block_t *', self._am.data_ptr())
         self._classifier.am_count = self._ffi.cast('int *', self._cnt.data_ptr())
 
-        return
+        # TODO: release memory and close self._lib
 
     def am_update(self, X, y):
         '''
