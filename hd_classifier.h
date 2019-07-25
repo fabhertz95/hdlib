@@ -42,3 +42,20 @@ int hamming_distance(
     const void * const b,
     const int n
 );
+
+// stores classifier state and encoder state
+void save(
+    const struct hd_classifier_t * const s_classif,
+    const struct hd_encoder_t * const s_enc,
+    const char * const filename
+);
+
+// initializes s_classifier and s_encoder
+// Allocates necessary memory and loads the data! init is not necessary!
+// returns 0 if load was successful
+// returns -1 if file was not found
+int load(
+    struct hd_classifier_t * const s_classif,
+    struct hd_encoder_t * const s_enc,
+    const char * const filename
+);

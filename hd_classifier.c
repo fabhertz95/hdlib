@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "hd_encoder.h"
 #include "hd_classifier.h"
@@ -101,4 +102,76 @@ int hamming_distance(
     }
 
     return result;
+}
+
+void save(
+    const struct hd_classifier_t * const s_classif,
+    const struct hd_encoder_t * const s_enc,
+    const char * const filename
+)
+{
+    FILE * fp = fopen(filename, "wb");
+
+    // write dimensionality
+    fwrite(&(s_classif->n_blk), sizeof(s_classif->n_blk), 1, fp);
+    fwrite(&(s_classif->n_class), sizeof(s_classif->n_class), 1, fp);
+    fwrite(&(s_enc->ngramm), sizeof(s_enc->ngramm), 1, fp);
+    fwrite(&(s_enc->n_items), sizeof(s_enc->n_items), 1, fp);
+
+    // write trained language vectors
+    fwrite(s_classif->am_clipped, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
+
+    // write item_lookup
+    fwrite(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
+}
+
+int load(
+    struct hd_classifier_t * const s_classif,
+    struct hd_encoder_t * const s_enc,
+    const char * filename
+)
+{
+    // to keep track of how many bytes were read, for checking if everything was ok
+    int bytes_read = 0;
+
+    // try to open file
+    FILE * fp = fopen(filename, "rb");
+
+    // exit if fp is null
+    if (fp == NULL) return -1;
+
+    // first, read dimensionality from the file
+    bytes_read += fread(&(s_classif->n_blk), sizeof(s_classif->n_blk), 1, fp);
+    bytes_read += fread(&(s_classif->n_class), sizeof(s_classif->n_class), 1, fp);
+    bytes_read += fread(&(s_enc->ngramm), sizeof(s_enc->ngramm), 1, fp);
+    bytes_read += fread(&(s_enc->n_items), sizeof(s_enc->n_items), 1, fp);
+    s_enc->n_blk = s_classif->n_blk; // also apply n_blk to encoder
+
+    printf("Reading model: D=%d, n_class=%d, ngramm=%d, n_items=%d\n",
+           s_enc->n_blk * 32,
+           s_classif->n_class,
+           s_enc->ngramm,
+           s_enc->n_items);
+
+    // now, allocate the necessary memory
+    hd_classifier_init(s_classif, s_classif->n_blk, s_classif->n_class);
+    hd_encoder_init(s_enc, s_enc->n_blk, s_enc->ngramm, s_enc->n_items);
+    // TODO This line above also initializes the item lookup!
+
+    // read the trained language vectors
+    bytes_read += fread(s_classif->am_clipped, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
+
+    // read item_lookup
+    bytes_read += fread(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
+
+    // check if the right amount of bytes were read
+    if (bytes_read == 4 + s_classif->n_blk * s_classif->n_class + s_enc->n_items * s_enc->n_blk)
+    {
+        return 0;
+    }
+    else
+    {
+        printf("Failed to read file: %s! Bytes read: %d\n", filename, bytes_read);
+        return -1;
+    }
 }

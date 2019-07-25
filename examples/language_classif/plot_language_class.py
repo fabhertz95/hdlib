@@ -25,7 +25,6 @@ testing = True
 # data loader
 dl = load_data()
 
-
 # init HD classifier
 ngramm = 3
 encoding = "sumNgramm"
@@ -45,7 +44,7 @@ hd = hd_classifier_ext()
 
 if training:
     #hd.am_init(dl._n_labels)
-    hd.am_init(D, nitem, ngramm, dl._n_labels)
+    hd.am_init(D, nitem, dl._n_labels, ngramm)
     label = 0
 
     while (label != -1):
@@ -60,7 +59,11 @@ if training:
         hd.am_update(data, label)
 
     hd.am_threshold()
-    hd.save()
+    #hd.save()
+    hd.save(name)
+else:
+    #hd.load()
+    hd.load(name)
 
 ########################## testing ########################################
 

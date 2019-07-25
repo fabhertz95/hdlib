@@ -30,6 +30,7 @@ struct hd_encoder_t
     // HD vector lookup table
     // shape: [n_items, n_blk]
     block_t * item_lookup;
+    int n_items;
 };
 
 void hd_encoder_init(

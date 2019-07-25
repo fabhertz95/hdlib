@@ -49,11 +49,24 @@ class hd_classifier_ext():
             n_feat
         )
 
-    def save(self):
-        pass # TODO
+    def save(self, filename):
+        self._lib.save(self._classifier, self._encoder, self._ffi.new("char[]", filename.encode('ascii')))
 
-    def load(self):
-        pass # TODO
+    def load(self, filename):
+        # prepare classifier and encoder structs
+        self._classifier = self._ffi.new('struct hd_classifier_t *')
+        self._encoder = self._ffi.new('struct hd_encoder_t *')
+        self._lib.hamming_distance_init()
+
+        # load the data
+        result = self._lib.load(self._classifier, self._encoder, self._ffi.new("char[]", filename.encode('ascii')))
+        assert result == 0
+
+        self._n_classes = self._classifier.n_class
+
+        # prepare data for interaction
+        self._ngramm_sum_buffer = t.Tensor(self._encoder.n_blk * 32).type(t.int32).contiguous()
+        self._encoder.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
 
     def am_init(self, D, nitem, n_classes, ngramm=3):
         # round D up to the nearest multiple of 32

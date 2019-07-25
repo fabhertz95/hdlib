@@ -120,6 +120,7 @@ void hd_encoder_init(
 {
     state->n_blk = n_blk;
     state->ngramm = ngramm;
+    state->n_items = n_items;
     state->ngramm_buffer = malloc(n_blk * sizeof(block_t));
     state->ngramm_sum_buffer = malloc(n_blk * sizeof(block_t) * 8 * sizeof(uint32_t));
     state->item_buffer = malloc(ngramm * n_blk * sizeof(block_t));
