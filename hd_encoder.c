@@ -261,7 +261,7 @@ void hd_encoder_clip(
         }
     }
     else
-    {    
+    {
         for (int i = 0; i < n_in; i++)
         {
             out[i / 32] <<= 1;

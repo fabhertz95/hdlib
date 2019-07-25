@@ -1,5 +1,5 @@
 /*
- * Main file to load a pretrained model and predict (prepared) test samples 
+ * Main file to load a pretrained model and predict (prepared) test samples
  */
 
 #include <stdint.h>
@@ -30,7 +30,7 @@ feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
     FILE * fp = fopen(current_filename, "rb");
     if (fp == NULL) return NULL;
 
-    int bytes_read = 0; 
+    int bytes_read = 0;
 
     // read class idx and size
     bytes_read += fread(y, sizeof(class_t), 1, fp);
@@ -107,6 +107,6 @@ int main(void)
     free(encoder.item_buffer);
     free(encoder.item_lookup);
     free(classifier.class_vec);
-    
+
     return 0;
 }
