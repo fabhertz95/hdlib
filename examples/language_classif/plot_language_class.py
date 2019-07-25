@@ -88,3 +88,7 @@ if testing:
             print("Error: True class: {:}, Estimation: {:}".format(y, y_hat))
 
     print("Accuracy: {:}".format(1 - err / n_test))
+
+else:
+    # store test data as binary files
+    dl.store_test_data('data/binary_test_data')

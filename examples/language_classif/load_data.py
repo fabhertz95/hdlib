@@ -144,3 +144,37 @@ class load_data:
             label = -1
 
         return char_array.reshape(1, -1), np.array(label).reshape(1)
+
+    def store_test_data(self, foldername, num=0):
+
+        import struct
+        import os
+
+        # make sure that the folder exists
+        if not os.path.exists(foldername):
+            os.makedirs(foldername)
+
+        # default num means everything
+        if num == 0:
+            num = self._n_test_labels
+
+        for i in range(num):
+            X, y = self.get_test_item()
+
+            n_samples, n_x = X.shape
+            assert n_samples == 1
+
+            if y == -1:
+                break
+
+            filename = os.path.join(foldername, f"sample_{i:05d}")
+
+            with open(filename, "wb") as _f:
+                # wirte label
+                _f.write(struct.pack("B", y.item()))
+                # write shape
+                _f.write(struct.pack(">i", X.shape[1]))
+                # write data
+                for feature in X[0]:
+                    # TODO change to uint8_t
+                    _f.write(struct.pack(">i", feature.item()))
