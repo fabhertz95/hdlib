@@ -124,7 +124,7 @@ class load_data:
             self._tr_idx += 1
         else:
             self._tr_idx = 0
-            char_array = np.array((2,))
+            char_array = np.array((2,), dtype=np.uint8)
         return char_array.reshape(1, -1), np.array(self._tr_idx - 1).reshape(1)
 
     def get_test_item(self):
@@ -140,7 +140,7 @@ class load_data:
             self._test_idx += 1
 
         else:
-            char_array = np.array([])
+            char_array = np.array([], dtype=np.uint8)
             label = -1
 
         return char_array.reshape(1, -1), np.array(label).reshape(1)
@@ -177,4 +177,4 @@ class load_data:
                 # write data
                 for feature in X[0]:
                     # TODO change to uint8_t
-                    _f.write(struct.pack("<i", feature.item()))
+                    _f.write(struct.pack("B", feature.item()))

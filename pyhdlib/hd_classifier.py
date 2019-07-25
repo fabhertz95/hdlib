@@ -111,7 +111,7 @@ class hd_classifier_ext():
         y: numpy array, size = [n_samples]
                 Training labels
         '''
-        X = t.from_numpy(X).type(t.int32)
+        X = t.from_numpy(X).type(t.uint8)
         y = t.from_numpy(y).type(t.int32)
 
         n_samples = X.shape[0]
@@ -169,7 +169,7 @@ class hd_classifier_ext():
                 predicted values.
 
         '''
-        X = t.from_numpy(X).type(t.int32)
+        X = t.from_numpy(X).type(t.uint8)
         n_samples = X.shape[0]
         dec_values = t.Tensor(n_samples)
 
