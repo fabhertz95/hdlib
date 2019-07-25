@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' 
+'''
 
 =========================================
 Language Classification Data Loader Class
@@ -173,8 +173,8 @@ class load_data:
                 # wirte label
                 _f.write(struct.pack("B", y.item()))
                 # write shape
-                _f.write(struct.pack(">i", X.shape[1]))
+                _f.write(struct.pack("<i", X.shape[1]))
                 # write data
                 for feature in X[0]:
                     # TODO change to uint8_t
-                    _f.write(struct.pack(">i", feature.item()))
+                    _f.write(struct.pack("<i", feature.item()))
