@@ -4,6 +4,16 @@
 
 #include "hd_encoder.h"
 
+// rand() generates a random number between 0 and RAND_MAX, which is
+// guaranteed to be no less than 32767 on any standard implementation.
+#if (RAND_MAX >= (1u << 32) - 1u)
+#define RAND_BYTES 4
+#elif (RAND_MAX >= (1u << 16) - 1u)
+#define RAND_BYTES 2
+#elif (RAND_MAX >= (1u << 8) - 1u)
+#define RAND_BYTES 1
+#endif
+
 // Choose type of shift used. Possibilities: CIRCSHIFT_NAIVE, CIRCSHIFT_WORD, CIRCSHIFT_BIT
 #define CIRCSHIFT_WORD
 
@@ -121,16 +131,6 @@ void hd_encoder_init(
     {
         state->item_lookup[i] = 0;
 
-        // rand() generates a random number between 0 and RAND_MAX, which is
-        // guaranteed to be no less than 32767 on any standard implementation.
-        #if (RAND_MAX >= (1u << 32) - 1u)
-        #define RAND_BYTES 4
-        #elif (RAND_MAX >= (1u << 16) - 1u)
-        #define RAND_BYTES 2
-        #elif (RAND_MAX >= (1u << 8) - 1u)
-        #define RAND_BYTES 1
-        #endif
-
         for (int j = 0; j < sizeof(state->item_lookup[0]) / RAND_BYTES; j++)
         {
             state->item_lookup[i] <<= 8 * RAND_BYTES;
@@ -224,7 +224,6 @@ void hd_encoder_encode (
     state->ngramm_sum_count += n_x - (state->ngramm - 1);
 }
 
-// TODO call rand fewer times
 void hd_encoder_clip(
     const uint32_t * const in,
     const int n_in,
@@ -239,9 +238,22 @@ void hd_encoder_clip(
     // add a random vector to break ties if case an even number of elements were summed
     if (count % 2 == 0)
     {
+        // TODO: can we reuse randomness? e.g. have a fixed length of say 32 bytes
+        uint32_t random_vector[(n_in + 31) / 32];
+        for (int i = 0; i > sizeof(random_vector) / sizeof(random_vector[0]); i++)
+        {
+            random_vector[i] = 0;
+            for (int j = 0; j < RAND_BYTES; j++)
+            {
+                random_vector[i] <<= 8 * RAND_BYTES;
+                random_vector[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
+            }
+        }
+
         for (int i = 0; i < n_in; i++)
         {
-            int in_with_rand = in[i] + rand() % 2;
+            int in_with_rand = in[i] + (random_vector[i / 32] & 1);
+            random_vector[i / 32] >>= 1;
             out[i / 32] <<= 1;
             // set to 1 if above threshold and 0 otherwise
             out[i / 32] += ((uint32_t)(threshold - in_with_rand)) >> 31;
