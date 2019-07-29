@@ -28,7 +28,8 @@ void circshift_naive(block_t * const arr, const int n_blk, const int n)
         int shift_carry = sizeof(block_t) * 8 - n;
         block_t carry = arr[n_blk-1] >> shift_carry;
         block_t tmp;
-        for (int i = 0; i < n_blk; i++)
+        int i;
+        for (i = 0; i < n_blk; i++)
         {
             tmp = arr[i];
             arr[i] = (arr[i] << shift) | carry;
@@ -42,7 +43,8 @@ void circshift_naive(block_t * const arr, const int n_blk, const int n)
         int shift_carry = sizeof(block_t) * 8 + n;
         block_t carry = arr[n_blk-1] << shift_carry;
         block_t tmp;
-        for (int i = 0; i < n_blk; i++)
+        int i;
+        for (i = 0; i < n_blk; i++)
         {
             tmp = arr[i];
             arr[i] = (arr[i] >> shift) | carry;
@@ -80,7 +82,8 @@ void circshift_bit(block_t * const arr, const int n_blk, const int n)
         // shift left
         int shift = n;
         int shift_carry = sizeof(block_t) * 8 - n;
-        for (int i = 0; i < n_blk; i++)
+        int i;
+        for (i = 0; i < n_blk; i++)
         {
             arr[i] = (arr[i] << shift) | (arr[i] >> shift_carry);
         }
@@ -90,7 +93,8 @@ void circshift_bit(block_t * const arr, const int n_blk, const int n)
         // shift right
         int shift = -n;
         int shift_carry = sizeof(block_t) * 8 + n;
-        for (int i = 0; i < n_blk; i++)
+        int i;
+        for (i = 0; i < n_blk; i++)
         {
             arr[i] = (arr[i] >> shift) | (arr[i] << shift_carry);
         }
@@ -128,11 +132,13 @@ void hd_encoder_init(
     state->item_lookup = malloc(n_items * n_blk * sizeof(block_t));
 
     // initialise HD vector lookup table with uniformly distributed 0s and 1s
-    for (int i = 0; i < n_items * n_blk; ++i)
+    int i;
+    for (i = 0; i < n_items * n_blk; ++i)
     {
         state->item_lookup[i] = 0;
 
-        for (int j = 0; j < sizeof(state->item_lookup[0]) / RAND_BYTES; j++)
+        int j;
+        for (j = 0; j < sizeof(state->item_lookup[0]) / RAND_BYTES; j++)
         {
             state->item_lookup[i] <<= 8 * RAND_BYTES;
             state->item_lookup[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
@@ -160,7 +166,8 @@ void hd_encoder_encode_ngramm(
     *p_head = (*p_head + 1) % ngramm;
 
     // transform previous items
-    for (int i = 0; i < ngramm; i++)
+    int i;
+    for (i = 0; i < ngramm; i++)
     {
         if (i != *p_head)
         {
@@ -173,11 +180,12 @@ void hd_encoder_encode_ngramm(
 
     // calculate n-gramm of all items
     memcpy(state->ngramm_buffer, buf, n_blk * sizeof buf[0]);
-    for (int i = 1; i != ngramm; i++)
+    for (i = 1; i != ngramm; i++)
     {
         block_t * output_iter = state->ngramm_buffer;
         block_t * buf_iter = buf + (i * n_blk);
-        for (int j = 0; j < n_blk; j++)
+        int j;
+        for (j = 0; j < n_blk; j++)
         {
             *output_iter++ ^= *buf_iter++;
         }
@@ -199,7 +207,8 @@ void hd_encoder_encode (
     memset(state->item_buffer, 0, n_blk * state->ngramm * sizeof(state->ngramm_sum_buffer[0]));
 
     // loop over every feature (indexed character of the text)
-    for (int feat_idx = 0; feat_idx < n_x; feat_idx++) {
+    int feat_idx;
+    for (feat_idx = 0; feat_idx < n_x; feat_idx++) {
         // get position of item in itemMemory for current feature (indexed character)
         feature_t item_lookup_idx = x[feat_idx];
 
@@ -213,8 +222,10 @@ void hd_encoder_encode (
             // add temporary output to sumVec
             uint32_t * ngramm_sum_buffer_iter = state->ngramm_sum_buffer;
             block_t * ngramm_buffer_iter = state->ngramm_buffer;
-            for (int i = 0; i < n_blk; i++) {
-                for (int j = 0; j < sizeof(block_t) * 8; j++) {
+            int i;
+            for (i = 0; i < n_blk; i++) {
+                int j;
+                for (j = 0; j < sizeof(block_t) * 8; j++) {
                     *ngramm_sum_buffer_iter++ += ((*ngramm_buffer_iter) >> j) & 1;
                 }
                 ngramm_buffer_iter++;
@@ -241,17 +252,19 @@ void hd_encoder_clip(
     {
         // TODO: can we reuse randomness? e.g. have a fixed length of say 32 bytes
         uint32_t random_vector[(n_in + 31) / 32];
-        for (int i = 0; i > sizeof(random_vector) / sizeof(random_vector[0]); i++)
+        int i;
+        for (i = 0; i > sizeof(random_vector) / sizeof(random_vector[0]); i++)
         {
             random_vector[i] = 0;
-            for (int j = 0; j < RAND_BYTES; j++)
+            int j;
+            for (j = 0; j < RAND_BYTES; j++)
             {
                 random_vector[i] <<= 8 * RAND_BYTES;
                 random_vector[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
             }
         }
 
-        for (int i = 0; i < n_in; i++)
+        for (i = 0; i < n_in; i++)
         {
             int in_with_rand = in[i] + (random_vector[i / 32] & 1);
             random_vector[i / 32] >>= 1;
@@ -262,7 +275,8 @@ void hd_encoder_clip(
     }
     else
     {
-        for (int i = 0; i < n_in; i++)
+        int i;
+        for (i = 0; i < n_in; i++)
         {
             out[i / 32] <<= 1;
             out[i / 32] += ((uint32_t)(threshold - in[i])) >> 31;

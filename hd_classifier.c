@@ -22,7 +22,8 @@ void hd_classifier_threshold(
     const struct hd_classifier_t * const state
 )
 {
-    for (class_t class = 0; class < state->n_class; class++)
+    class_t class;
+    for (class = 0; class < state->n_class; class++)
     {
         hd_encoder_clip(
             state->class_vec_sum + class * state->n_blk * sizeof(block_t) * 8,
@@ -52,7 +53,8 @@ class_t hd_classifier_predict(
 
     int best_score = INT_MAX;
     class_t best_class;
-    for (class_t class = 0; class < state->n_class; class++)
+    class_t class;
+    for (class = 0; class < state->n_class; class++)
     {
         int score = hamming_distance(
             encoder_state->ngramm_buffer,
@@ -74,11 +76,13 @@ char hamming_distance_lookup[1 << 8];
 
 void hamming_distance_init()
 {
-    for (int i = 0; i < 1 << 8; i++)
+    int i;
+    for (i = 0; i < 1 << 8; i++)
     {
         int tmp = i;
         hamming_distance_lookup[i] = 0;
-        for (int j = 0; j < 8; j++)
+        int j;
+        for (j = 0; j < 8; j++)
         {
             hamming_distance_lookup[i] += tmp & 1;
             tmp >>= 1;
@@ -96,7 +100,8 @@ int hamming_distance(
     const uint8_t * a_iter = a;
     const uint8_t * b_iter = b;
 
-    for (int i = 0; i < n; i++)
+    int i;
+    for (i = 0; i < n; i++)
     {
         result += hamming_distance_lookup[*a_iter++ ^ *b_iter++];
     }
