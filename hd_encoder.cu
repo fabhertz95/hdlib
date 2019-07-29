@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 extern "C" {
 #include "hd_encoder.h"
@@ -116,12 +117,17 @@ extern "C" void hd_encoder_encode (
     uint32_t * d_ngramm_sum_buffer;
     block_t * d_item_buffer;
     feature_t * d_x;
+    printf("allocate ngramm_sum_buffer: %d\n", n_blk * sizeof(block_t) * 8);
+    // TODO hangs here
     cudaMallocManaged(&d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8);
+    printf("allocate item_buffer: %d\n", ngramm * n_blk * sizeof(block_t));
     cudaMallocManaged(&d_item_buffer, ngramm * n_blk * sizeof(block_t));
+    printf("allocate x: %d\n", n_x * sizeof(feature_t));
     cudaMallocManaged(&d_x, n_x * sizeof(feature_t));
 
     // TODO allocate and copy these values in some init function, because they will remain constant for all samples
     block_t * d_item_lookup;
+    printf("allocate item_lookup: %d\n", n_items * n_blk * sizeof(block_t));
     cudaMallocManaged(&d_item_lookup, n_items * n_blk * sizeof(block_t));
 
     // reset sum buffer and item buffer
@@ -135,6 +141,7 @@ extern "C" void hd_encoder_encode (
     cudaMemcpy(d_x, x, n_x * sizeof(feature_t), cudaMemcpyHostToDevice);
 
     // call the kernel
+    printf("call kernel\n");
     int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
     hd_encoder_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK>>>(
         n_blk,
