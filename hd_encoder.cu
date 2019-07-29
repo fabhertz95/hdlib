@@ -119,16 +119,16 @@ extern "C" void hd_encoder_encode (
     feature_t * d_x;
     printf("allocate ngramm_sum_buffer: %d\n", n_blk * sizeof(block_t) * 8);
     // TODO hangs here
-    cudaMallocManaged(&d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8);
+    cudaMalloc(&d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8);
     printf("allocate item_buffer: %d\n", ngramm * n_blk * sizeof(block_t));
-    cudaMallocManaged(&d_item_buffer, ngramm * n_blk * sizeof(block_t));
+    cudaMalloc(&d_item_buffer, ngramm * n_blk * sizeof(block_t));
     printf("allocate x: %d\n", n_x * sizeof(feature_t));
-    cudaMallocManaged(&d_x, n_x * sizeof(feature_t));
+    cudaMalloc(&d_x, n_x * sizeof(feature_t));
 
     // TODO allocate and copy these values in some init function, because they will remain constant for all samples
     block_t * d_item_lookup;
     printf("allocate item_lookup: %d\n", n_items * n_blk * sizeof(block_t));
-    cudaMallocManaged(&d_item_lookup, n_items * n_blk * sizeof(block_t));
+    cudaMalloc(&d_item_lookup, n_items * n_blk * sizeof(block_t));
 
     // reset sum buffer and item buffer
     cudaMemset(d_ngramm_sum_buffer, 0, n_blk * sizeof(block_t) * 8);
