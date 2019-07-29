@@ -20,6 +20,12 @@ extern "C" {
 // number of threads per block in the grid
 #define NUM_THREADS_IN_BLOCK 128
 
+// TODO: Stuff to optimize
+// * copy item_lookup once generated or loaded!
+// * Use local ngramm_sum_buffer as 32 distinct variables, such that registers might be used
+// * Use local item_buffer also as 3 (or more) distinct variables, such that registers might be used.
+// * Copy one part of x to device, then compute it and copy the next part at the same time.
+//   Use different streams for each part of the input, and use cudaMemcopyAsync.
 __global__ void hd_encoder_kernel(
     const int n_blk,
     const int ngramm,
@@ -101,6 +107,8 @@ extern "C" void hd_encoder_init(
             state->item_lookup[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
         }
     }
+
+    // TODO copy this LUT to the device here
 }
 
 extern "C" void hd_encoder_encode (
