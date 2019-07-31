@@ -50,16 +50,15 @@ __global__ void hd_encoder_kernel(
     uint32_t * s_ngramm_sum_buffer = (uint32_t*)&s_ngramm_buffer[blockDim.x * ngramm];
     block_t * s_item_lookup = (block_t*)&s_ngramm_sum_buffer[blockDim.x * sizeof(block_t) * 8];
 
-    uint32_t s_i; // iterator
-    // load ngramm_buffer
-    for (s_i = 0; s_i < ngramm; s_i++) {
-        s_ngramm_buffer[s_i * blockDim.x + threadIdx.x] = ngramm_buffer[s_i * n_blk + blk];
-    }
-
+    // reset ngramm_buffer
+    //memset(s_ngramm_buffer, 0, blockDim.x * ngramm * sizeof(block_t));
+    
     // load ngramm_sum_buffer
-    memcpy(s_ngramm_sum_buffer, &ngramm_sum_buffer[blockIdx.x * blockDim.x * sizeof(block_t) * 8], blockDim.x * sizeof(block_t) * 8 * sizeof(uint32_t));
+    //memcpy(s_ngramm_sum_buffer, &ngramm_sum_buffer[blockIdx.x * blockDim.x * sizeof(block_t) * 8], blockDim.x * sizeof(block_t) * 8 * sizeof(uint32_t));
+    memset(s_ngramm_sum_buffer, 0, blockDim.x * sizeof(block_t) * 8 * sizeof(uint32_t));
 
     // load item_lookup
+    uint32_t s_i; // iterator
     for (s_i = 0; s_i < n_items; s_i++) {
         s_item_lookup[s_i * blockDim.x + threadIdx.x] = item_lookup[s_i * n_blk + blk];
     }
@@ -180,8 +179,8 @@ extern "C" void hd_encoder_encode (
 
     // reset sum buffer and item buffer
     // TODO can we do this inside the kernel?
-    cudaMemset(state->device.ngramm_sum_buffer, 0, n_blk * sizeof(block_t) * 8 * sizeof(uint32_t));
-    cudaMemset(state->device.ngramm_buffer, 0, ngramm * n_blk * sizeof(block_t));
+    //cudaMemset(state->device.ngramm_sum_buffer, 0, n_blk * sizeof(block_t) * 8 * sizeof(uint32_t));
+    //cudaMemset(state->device.ngramm_buffer, 0, ngramm * n_blk * sizeof(block_t));
 
     // copy the input data
     cudaMemcpy(d_x, x, n_x * sizeof(feature_t), cudaMemcpyHostToDevice);
