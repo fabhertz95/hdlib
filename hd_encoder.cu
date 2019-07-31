@@ -25,6 +25,8 @@ extern "C" {
 // * Use local item_buffer also as 3 (or more) distinct variables, such that registers might be used.
 // * Copy one part of x to device, then compute it and copy the next part at the same time.
 //   Use different streams for each part of the input, and use cudaMemcopyAsync.
+// * Allocate ngramm_sum_buffer (and item_buffer) only once on the gpu
+// * make clip also on the gpu, using the data from before, and don't copy the ngramm_sum_buffer over.
 __global__ void hd_encoder_kernel(
     const int n_blk,
     const int ngramm,
