@@ -146,6 +146,21 @@ void hd_encoder_init(
     }
 }
 
+void hd_encoder_setup_device(struct hd_encoder_t * const state) {
+    // nothing to do!
+}
+
+void hd_encoder_free(
+    struct hd_encoder_t * const state
+)
+{
+    free(state->ngramm_buffer);
+    free(state->ngramm_sum_buffer);
+    free(state->item_buffer);
+    free(state->item_lookup);
+}
+
+
 // overall speedup ideas:
 // - perform circular shift locally, e.g. every 32 entries
 // - split HD vectors into blocks and encode large inputs in chunks, i.e.

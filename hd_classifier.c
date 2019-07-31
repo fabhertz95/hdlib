@@ -18,6 +18,13 @@ void hd_classifier_init(
     state->class_vec = malloc(n_class * n_blk * sizeof(block_t));
 }
 
+void hd_classifier_free(
+    struct hd_classifier_t * const state
+)
+{
+    free(state->class_vec);
+}
+
 void hd_classifier_threshold(
     const struct hd_classifier_t * const state
 )

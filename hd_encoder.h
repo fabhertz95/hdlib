@@ -5,6 +5,17 @@ typedef uint8_t feature_t;
 // packed HD vector block
 typedef uint32_t block_t;
 
+// struct to store pointers on the device, which remain
+struct device_data_t
+{
+    // shape: [ngramm, n_blk]
+    block_t * ngramm_buffer;
+    // shape: [n_blk * 32]
+    uint32_t * ngramm_sum_buffer;
+    // shape: [n_items, n_blk]
+    block_t * item_lookup;
+};
+
 struct hd_encoder_t
 {
     // HD vector length
@@ -31,6 +42,9 @@ struct hd_encoder_t
     // shape: [n_items, n_blk]
     block_t * item_lookup;
     int n_items;
+
+    // device pointers
+    struct device_data_t device;
 };
 
 void hd_encoder_init(
@@ -38,6 +52,14 @@ void hd_encoder_init(
     const int n_blk,
     const int ngramm,
     const int n_items
+);
+
+void hd_encoder_setup_device(
+    struct hd_encoder_t * const state
+);
+
+void hd_encoder_free(
+    struct hd_encoder_t * const state
 );
 
 void hd_encoder_encode_ngramm(

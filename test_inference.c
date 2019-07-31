@@ -67,6 +67,9 @@ int main(void)
         printf("Could not read model!\n");
         return 1;
     }
+
+    // setup the device (allocate device memory and copy item lookup to device)
+    hd_encoder_setup_device(&encoder);
     // model is now loaded and ready to do inference!
 
     // prepare current_filename
@@ -104,11 +107,8 @@ int main(void)
     printf("Accuracy: %f\n", 1.0 - (double)n_err / (double)n_tot);
 
     // free up all memory
-    free(encoder.ngramm_buffer);
-    free(encoder.ngramm_sum_buffer);
-    free(encoder.item_buffer);
-    free(encoder.item_lookup);
-    free(classifier.class_vec);
+    hd_encoder_free(&encoder);
+    hd_classifier_free(&classifier);
 
     return 0;
 }

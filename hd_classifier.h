@@ -24,6 +24,10 @@ void hd_classifier_init(
     const int n_class
 );
 
+void hd_classifier_free(
+    struct hd_classifier_t * const state
+);
+
 void hd_classifier_threshold(
     const struct hd_classifier_t * const state
 );
