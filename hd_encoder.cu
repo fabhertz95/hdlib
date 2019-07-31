@@ -30,6 +30,7 @@ __global__ void hd_encoder_kernel(
     const int ngramm,
     uint32_t * __restrict__ ngramm_sum_buffer,
     const block_t * __restrict__ item_lookup,
+    const int n_items,
     block_t * __restrict__ ngramm_buffer,
     const feature_t * __restrict__ x,
     const int n_x
@@ -43,38 +44,64 @@ __global__ void hd_encoder_kernel(
         return;
     }
 
+    // prepare shared memory
+    extern __shared__ uint32_t s[];
+    block_t * s_ngramm_buffer = (block_t*)s;
+    uint32_t * s_ngramm_sum_buffer = (uint32_t*)&s_ngramm_buffer[blockDim.x * ngramm];
+    block_t * s_item_lookup = (block_t*)&s_ngramm_sum_buffer[blockDim.x * sizeof(block_t) * 8];
+
+    uint32_t s_i; // iterator
+    // load ngramm_buffer
+    for (s_i = 0; s_i < ngramm; s_i++) {
+        s_ngramm_buffer[s_i * blockDim.x + threadIdx.x] = ngramm_buffer[s_i * n_blk + blk];
+    }
+
+    // load ngramm_sum_buffer
+    memcpy(s_ngramm_sum_buffer, &ngramm_sum_buffer[blockIdx.x * blockDim.x * sizeof(block_t) * 8], blockDim.x * sizeof(block_t) * 8 * sizeof(uint32_t));
+
+    // load item_lookup
+    for (s_i = 0; s_i < n_items; s_i++) {
+        s_item_lookup[s_i * blockDim.x + threadIdx.x] = item_lookup[s_i * n_blk + blk];
+    }
+
+    // TODO is barrier necessary?
+    __syncthreads();
+
     // loop over every single feature
     int feat_idx;
     for (feat_idx = 0; feat_idx < n_x; feat_idx++) {
         // get position of the item in the lookup table
         feature_t item_lookup_idx = x[feat_idx];
         // get the part of the item
-        block_t item = *(item_lookup + item_lookup_idx * n_blk + blk);
+        block_t item = s_item_lookup[item_lookup_idx * blockDim.x + threadIdx.x];
 
         // Shift the parts in in the item_buffer and add the new one
         int i;
         for (i = ngramm - 1; i >= 1; i--) {
-            block_t previous = ngramm_buffer[(i-1) * n_blk + blk];
-            ngramm_buffer[i * n_blk + blk] = (previous << 1) | (previous >> 31);
+            block_t previous = s_ngramm_buffer[(i-1) * blockDim.x + threadIdx.x];
+            s_ngramm_buffer[i * blockDim.x + threadIdx.x] = (previous << 1) | (previous >> 31);
         }
         // set the new value
-        ngramm_buffer[blk] = item;
+        s_ngramm_buffer[threadIdx.x] = item;
 
         // compute the encoded ngramm
         block_t tmp_ngramm_buffer = item;
         for (i = 1; i < ngramm; i++) {
-            tmp_ngramm_buffer ^= ngramm_buffer[i * n_blk + blk];
+            tmp_ngramm_buffer ^= s_ngramm_buffer[i * blockDim.x + threadIdx.x];
         }
 
         // add to sum buffer
         if (feat_idx >= ngramm - 1) {
-            uint32_t * ngramm_sum_buffer_iter = ngramm_sum_buffer + blk * sizeof(block_t) * 8;
+            uint32_t * s_ngramm_sum_buffer_iter = &s_ngramm_sum_buffer[threadIdx.x * sizeof(block_t) * 8];
             int j;
             for (j = 0; j < sizeof(block_t) * 8; j++) {
-                *ngramm_sum_buffer_iter++ += (tmp_ngramm_buffer >> j) & 1;
+                *s_ngramm_sum_buffer_iter++ += (tmp_ngramm_buffer >> j) & 1;
             }
         }
     }
+
+    // copy values back to ngramm_sum_buffer
+    memcpy(&ngramm_sum_buffer[blockIdx.x * blockDim.x * sizeof(block_t) * 8], s_ngramm_sum_buffer, blockDim.x * sizeof(block_t) * 8 * sizeof(uint32_t));
 }
 
 extern "C" void hd_encoder_init(
@@ -142,6 +169,7 @@ extern "C" void hd_encoder_encode (
 {
     const int n_blk = state->n_blk;
     const int ngramm = state->ngramm;
+    const int n_items = state->n_items;
 
     // reset the sum count
     state->ngramm_sum_count = 0;
@@ -160,11 +188,16 @@ extern "C" void hd_encoder_encode (
 
     // call the kernel
     int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
-    hd_encoder_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK>>>(
+    int shared_mem_size =
+        NUM_THREADS_IN_BLOCK * ngramm * sizeof(block_t) +               // ngramm_buffer
+        NUM_THREADS_IN_BLOCK * sizeof(block_t) * 8 * sizeof(uint32_t) + // ngramm_sum_buffer
+        NUM_THREADS_IN_BLOCK * n_items * sizeof(block_t);               // item_lookup
+    hd_encoder_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK, shared_mem_size>>>(
         n_blk,
         ngramm,
         state->device.ngramm_sum_buffer,
         state->device.item_lookup,
+        n_items,
         state->device.ngramm_buffer,
         d_x,
         n_x
