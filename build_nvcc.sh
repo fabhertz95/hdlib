@@ -5,4 +5,4 @@
 nvccflags="-O3 --use_fast_math -std=c++11 -Xcompiler '-fopenmp' --gpu-architecture=compute_53"
 linkflags="--shared --compiler-options -fPIC --linker-options --no-undefined"
 nvcc hd_encoder.cu hd_classifier.c test_inference.c -o test_inference $nvccflags
-nvcc hd_encoder.cu hd_classifier.c -o hdlib_$(uname -m) $nvccflags $linkflags
+nvcc hd_encoder.cu hd_classifier.c -o hdlib_$(uname -m).so $nvccflags $linkflags

@@ -128,6 +128,8 @@ void save(
 
     // write item_lookup
     fwrite(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
+
+    fclose(fp);
 }
 
 int load(
@@ -168,6 +170,9 @@ int load(
 
     // read item_lookup
     bytes_read += fread(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
+
+    // close the file
+    fclose(fp);
 
     // check if the right amount of bytes were read
     if (bytes_read == 4 + s_classif->n_blk * s_classif->n_class + s_enc->n_items * s_enc->n_blk)

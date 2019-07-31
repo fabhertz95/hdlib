@@ -15,7 +15,7 @@
 #endif
 
 // Choose type of shift used. Possibilities: CIRCSHIFT_NAIVE, CIRCSHIFT_WORD, CIRCSHIFT_BIT
-#define CIRCSHIFT_WORD
+#define CIRCSHIFT_BIT
 
 // TODO: optimise shifts by always shifting by 1 to the right?
 

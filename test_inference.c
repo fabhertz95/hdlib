@@ -45,9 +45,11 @@ feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
     // check if the correct number of bytes were read
     if (bytes_read != 2 + *n_x) {
         printf("Failed to read file: %s!\n", current_filename);
+        fclose(fp);
         return NULL;
     }
 
+    fclose(fp);
     return x;
 }
 

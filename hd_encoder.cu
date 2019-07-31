@@ -1,7 +1,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 extern "C" {
 #include "hd_encoder.h"
@@ -72,7 +71,7 @@ __global__ void hd_encoder_kernel(
             uint32_t * ngramm_sum_buffer_iter = ngramm_sum_buffer + blk * sizeof(block_t) * 8;
             int j;
             for (j = 0; j < sizeof(block_t) * 8; j++) {
-                *ngramm_sum_buffer_iter++ += ((tmp_ngramm_buffer) >> j) & 1;
+                *ngramm_sum_buffer_iter++ += (tmp_ngramm_buffer >> j) & 1;
             }
         }
     }
@@ -121,25 +120,24 @@ extern "C" void hd_encoder_encode (
     const int ngramm = state->ngramm;
     const int n_items = state->n_items;
 
+    // reset the sum count
+    state->ngramm_sum_count = 0;
+
     // allocate memory on the device
     uint32_t * d_ngramm_sum_buffer;
     block_t * d_item_buffer;
     feature_t * d_x;
-    printf("allocate ngramm_sum_buffer: %d\n", n_blk * sizeof(block_t) * 8);
     // TODO hangs here
-    cudaMalloc(&d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8);
-    printf("allocate item_buffer: %d\n", ngramm * n_blk * sizeof(block_t));
+    cudaMalloc(&d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8 * sizeof(uint32_t));
     cudaMalloc(&d_item_buffer, ngramm * n_blk * sizeof(block_t));
-    printf("allocate x: %d\n", n_x * sizeof(feature_t));
     cudaMalloc(&d_x, n_x * sizeof(feature_t));
 
     // TODO allocate and copy these values in some init function, because they will remain constant for all samples
     block_t * d_item_lookup;
-    printf("allocate item_lookup: %d\n", n_items * n_blk * sizeof(block_t));
     cudaMalloc(&d_item_lookup, n_items * n_blk * sizeof(block_t));
 
     // reset sum buffer and item buffer
-    cudaMemset(d_ngramm_sum_buffer, 0, n_blk * sizeof(block_t) * 8);
+    cudaMemset(d_ngramm_sum_buffer, 0, n_blk * sizeof(block_t) * 8 * sizeof(uint32_t));
     cudaMemset(d_item_buffer, 0, ngramm * n_blk * sizeof(block_t));
 
     // copy the item lookup
@@ -149,7 +147,6 @@ extern "C" void hd_encoder_encode (
     cudaMemcpy(d_x, x, n_x * sizeof(feature_t), cudaMemcpyHostToDevice);
 
     // call the kernel
-    printf("call kernel\n");
     int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
     hd_encoder_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK>>>(
         n_blk,
@@ -162,7 +159,7 @@ extern "C" void hd_encoder_encode (
     );
 
     // copy the output (ngramm_sum_buffer) back from the device
-    cudaMemcpy(state->ngramm_sum_buffer, d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8, cudaMemcpyDeviceToHost);
+    cudaMemcpy(state->ngramm_sum_buffer, d_ngramm_sum_buffer, n_blk * sizeof(block_t) * 8 * sizeof(uint32_t), cudaMemcpyDeviceToHost);
 
     // free all memory
     cudaFree(d_ngramm_sum_buffer);
