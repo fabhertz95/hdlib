@@ -96,7 +96,7 @@ int main(void)
         n_tot++;
         if (yhat != y) {
             n_err++;
-            printf("Error: True class: %d, Estimation: %d\n", y, yhat);
+            //printf("Error: True class: %d, Estimation: %d\n", y, yhat);
         }
 
         // free the sample up again
