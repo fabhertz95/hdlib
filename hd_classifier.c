@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "hd_encoder.h"
 #include "hd_batch_encoder.h"
@@ -49,7 +50,15 @@ class_t hd_classifier_predict(
     const int n_x
 )
 {
+    // Measure time here!
+    struct timespec tstart = {0,0};
+    struct timespec tend = {0,0};
+    clock_gettime(CLOCK_REALTIME, &tstart);
     hd_encoder_encode(encoder_state, x, n_x);
+    clock_gettime(CLOCK_REALTIME, &tend);
+    long dtime = (1000000000 * tend.tv_sec + tend.tv_nsec) - (1000000000 * tstart.tv_sec + tstart.tv_nsec);
+    printf("%d, %ld\n", n_x, dtime / 1000);
+
     // TODO: move rename hd_encoder_clip to clip
     // and implement this call as hd_encoder_clip
     hd_encoder_clip(
