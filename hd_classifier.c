@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "hd_encoder.h"
+#include "hd_batch_encoder.h"
 #include "hd_classifier.h"
 
 void hd_classifier_init(
@@ -77,6 +78,50 @@ class_t hd_classifier_predict(
     }
 
     return best_class;
+}
+
+void hd_classifier_predict_batch(
+    const struct hd_classifier_t * const state,
+    struct hd_encoder_t * const encoder_states,
+    const int batch_size,
+    const feature_t ** const x,
+    const int * n_x,
+    class_t * prediction
+)
+{
+    hd_batch_encoder_encode(encoder_states, batch_size, x, n_x);
+
+    // for every sample in the batch, clip and do inference
+    int i;
+    for (i = 0; i < batch_size; i++) {
+        // TODO: move rename hd_encoder_clip to clip
+        // and implement this call as hd_encoder_clip
+        hd_encoder_clip(
+            encoder_states[i].ngramm_sum_buffer,
+            sizeof(block_t) * 8 * encoder_states[i].n_blk,
+            encoder_states[i].ngramm_sum_count,
+            encoder_states[i].ngramm_buffer
+        );
+
+        int best_score = INT_MAX;
+        class_t best_class;
+        class_t class;
+        for (class = 0; class < state->n_class; class++)
+        {
+            int score = hamming_distance(
+                encoder_states[i].ngramm_buffer,
+                state->class_vec + class * state->n_blk,
+                state->n_blk * sizeof(state->class_vec[0])
+            );
+
+            if (score < best_score)
+            {
+                best_score = score;
+                best_class = class;
+            }
+        }
+        prediction[i] = best_class;
+    }
 }
 
 char hamming_distance_lookup[1 << 8];

@@ -1,3 +1,9 @@
+#ifndef HD_ENCODER_H
+#define HD_ENCODER_H
+
+// number of threads per block in the grid
+#define NUM_THREADS_IN_BLOCK 128
+
 // TODO: use uint8_t for feature_t
 // input vector feature
 typedef uint8_t feature_t;
@@ -83,3 +89,5 @@ void hd_encoder_clip(
     const int count,
     block_t * const out
 );
+
+#endif //HD_ENCODER_H

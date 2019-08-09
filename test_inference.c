@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "hd_encoder.h"
+#include "hd_batch_encoder.h"
 #include "hd_classifier.h"
 
 #define MODEL_FILE "examples/language_classif/data/models/3gramm"
@@ -17,6 +18,8 @@
 #define TEST_SAMPLE_NAME "sample_00000"
 #define TEST_SAMPLE_NAME_LEN 12
 #define TEST_SAMPLE_NAME_IDX TEST_FOLDER_LEN + 7
+
+# define BATCH_SIZE 4
 
 char current_filename[TEST_FOLDER_LEN + TEST_SAMPLE_NAME_LEN + 1];
 
@@ -53,8 +56,7 @@ feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
     return x;
 }
 
-int main(void)
-{
+int do_inference(int num_samples) {
     // prepare data
     struct hd_encoder_t encoder;
     struct hd_classifier_t classifier;
@@ -101,6 +103,10 @@ int main(void)
 
         // free the sample up again
         free(x);
+
+        if (num_samples > 0 && idx >= num_samples) {
+            break;
+        }
     }
 
     // print results
@@ -111,4 +117,87 @@ int main(void)
     hd_classifier_free(&classifier);
 
     return 0;
+}
+
+int do_batch_inference(int num_samples) {
+    // prepare data
+    struct hd_encoder_t encoders[BATCH_SIZE];
+    struct hd_classifier_t classifier;
+
+    // initialize hamming distance
+    hamming_distance_init();
+
+    // load data (encoder data into the first encoder
+    if (load(&classifier, &(encoders[0]), MODEL_FILE) != 0) {
+        printf("Could not read model!\n");
+        return 1;
+    }
+
+    // setup the batch
+    hd_batch_encoder_init(encoders, BATCH_SIZE);
+
+    // setup the device (allocate device memory and copy item lookup to device)
+    hd_batch_encoder_setup_device(encoders, BATCH_SIZE);
+    // model is now loaded and ready to do inference!
+
+    // prepare current_filename
+    strcpy(current_filename, TEST_FOLDER);
+    strcat(current_filename, TEST_SAMPLE_NAME);
+
+    // prepare data
+    int idx = 0;
+    int n_x[BATCH_SIZE];
+    feature_t * x[BATCH_SIZE];
+    class_t y[BATCH_SIZE];
+    class_t yhat[BATCH_SIZE];
+
+    // loop through every element until file was no longer found
+    int n_err = 0;
+    int n_tot = 0;
+    while(1) {
+        // load all samples from the batch
+        int i;
+        for (i = 0; i < BATCH_SIZE; i++) {
+            x[i] = load_test_sample(idx++, &(n_x[i]), &(y[i]));
+            if (x[i] == NULL) break;
+        }
+        // if exited before, the block is smaller
+        if (i == 0) break;
+        int batch_size = i;
+
+        // make prediction
+        hd_classifier_predict_batch(&classifier, encoders, batch_size, (const feature_t**)x, n_x, yhat);
+
+        // check if result was the same
+        for (i = 0; i < batch_size; i++) {
+            n_tot++;
+            if (yhat[i] != y[i]) {
+                n_err++;
+                printf("Error: True class: %d, Estimation: %d\n", y[i], yhat[i]);
+            }
+
+            // free up memory
+            free(x[i]);
+        }
+
+        if (num_samples > 0 && idx >= num_samples) {
+            break;
+        }
+    }
+
+    // print results
+    printf("Accuracy: %f\n", 1.0 - (double)n_err / (double)n_tot);
+
+    // free up all memory
+    hd_batch_encoder_free(encoders, BATCH_SIZE);
+    hd_classifier_free(&classifier);
+
+    return 0;
+}
+
+int main(void)
+{
+    // set parameter to something positive to limit the number of samples processed
+    return do_batch_inference(-1);
+    //return do_inference(-1);
 }

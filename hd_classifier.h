@@ -1,3 +1,6 @@
+#ifndef HD_CLASSIFIER_H
+#define HD_CLASSIDIER_H
+
 typedef uint8_t class_t;
 
 struct hd_classifier_t
@@ -39,6 +42,15 @@ class_t hd_classifier_predict(
     const int n_x
 );
 
+void hd_classifier_predict_batch(
+    const struct hd_classifier_t * const state,
+    struct hd_encoder_t * const encoder_states,
+    const int batch_size,
+    const feature_t ** const x,
+    const int * n_x,
+    class_t * prediction
+);
+
 void hamming_distance_init();
 
 int hamming_distance(
@@ -63,3 +75,5 @@ int load(
     struct hd_encoder_t * const s_enc,
     const char * const filename
 );
+
+#endif //HD_CLASSIFIER_H
