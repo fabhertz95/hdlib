@@ -4,8 +4,8 @@ plot hdlib data
 import numpy as np
 import matplotlib.pyplot as plt
 
-CPU = np.genfromtxt("cpu_data_1000.csv", delimiter=",")
-GPU = np.genfromtxt("gpu_data_1000.csv", delimiter=",")
+CPU = np.genfromtxt("cpu_data.csv", delimiter=",")
+GPU = np.genfromtxt("gpu_data.csv", delimiter=",")
 
 print(CPU.shape)
 
