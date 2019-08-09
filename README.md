@@ -21,20 +21,20 @@ $ source activate hdlib-env
 
 ## Optimizations
 
-[x] CPU
-[x] GPU with global memory
-[x] GPU with shared memory
-[x] GPU with thread-local memory
-[x] GPU with thread-local memory and batches (does not work well)
-[ ] better batching
-[ ] memory coalescing
-[ ] memory bank alignment
-[ ] clipping and inference to GPU
+- [x] CPU
+- [x] GPU with global memory
+- [x] GPU with shared memory
+- [x] GPU with thread-local memory
+- [x] GPU with thread-local memory and batches (does not work well)
+- [ ] better batching
+- [ ] memory coalescing
+- [ ] memory bank alignment
+- [ ] clipping and inference to GPU
 
 ## Measurements
 
-[x] CPU
-[ ] GPU with global memory
-[x] GPU with shared memory
-[x] GPU with thread-local memory
-[x] GPU with thread-local memory and batches (does not work well)
+- [x] CPU
+- [ ] GPU with global memory
+- [x] GPU with shared memory
+- [x] GPU with thread-local memory
+- [x] GPU with thread-local memory and batches (does not work well)
