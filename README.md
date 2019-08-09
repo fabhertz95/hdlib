@@ -16,3 +16,25 @@ $ source activate hdlib-env
 ## Author
 
 * **Michael Hersche** - *Initial work* - [MHersche](https://github.com/MHersche)
+* **Sebastian Kurella** - [skurella](https://github.com/skurella)
+* **Tibor Schneider** - [tiborschneider](https://github.com/tiborschneider)
+
+## Optimizations
+
+[x] CPU
+[x] GPU with global memory
+[x] GPU with shared memory
+[x] GPU with thread-local memory
+[x] GPU with thread-local memory and batches (does not work well)
+[ ] better batching
+[ ] memory coalescing
+[ ] memory bank alignment
+[ ] clipping and inference to GPU
+
+## Measurements
+
+[x] CPU
+[ ] GPU with global memory
+[x] GPU with shared memory
+[x] GPU with thread-local memory
+[x] GPU with thread-local memory and batches (does not work well)
