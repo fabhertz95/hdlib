@@ -98,10 +98,26 @@ void hd_classifier_predict_batch(
     class_t * prediction
 )
 {
+    // do time measurement
+    struct timespec tstart = {0,0};
+    struct timespec tend = {0,0};
+    clock_gettime(CLOCK_REALTIME, &tstart);
+
     hd_batch_encoder_encode(encoder_states, batch_size, x, n_x);
 
-    // for every sample in the batch, clip and do inference
+    clock_gettime(CLOCK_REALTIME, &tend);
+    long dtime = (1000000000 * tend.tv_sec + tend.tv_nsec) - (1000000000 * tstart.tv_sec + tstart.tv_nsec);
+
+    // compute total number of samples
+    int tot_n_x = 0;
     int i;
+    for (i = 0; i < batch_size; i++) {
+        tot_n_x += n_x[i];
+    }
+    printf("%d, %ld\n", tot_n_x, dtime / 1000);
+
+    // for every sample in the batch, clip and do inference
+    //int i;
     for (i = 0; i < batch_size; i++) {
         // TODO: move rename hd_encoder_clip to clip
         // and implement this call as hd_encoder_clip

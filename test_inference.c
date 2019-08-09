@@ -19,7 +19,7 @@
 #define TEST_SAMPLE_NAME_LEN 12
 #define TEST_SAMPLE_NAME_IDX TEST_FOLDER_LEN + 7
 
-# define BATCH_SIZE 4
+# define BATCH_SIZE 16
 
 char current_filename[TEST_FOLDER_LEN + TEST_SAMPLE_NAME_LEN + 1];
 
@@ -173,7 +173,7 @@ int do_batch_inference(int num_samples) {
             n_tot++;
             if (yhat[i] != y[i]) {
                 n_err++;
-                printf("Error: True class: %d, Estimation: %d\n", y[i], yhat[i]);
+                //printf("Error: True class: %d, Estimation: %d\n", y[i], yhat[i]);
             }
 
             // free up memory
