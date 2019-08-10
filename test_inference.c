@@ -53,8 +53,17 @@ feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
     return x;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    int verbose = 0;
+    
+    int i;
+    for (i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "-v") == 0) {
+            verbose = 1;
+        }
+    }
+
     // prepare data
     struct hd_encoder_t encoder;
     struct hd_classifier_t classifier;
@@ -96,7 +105,9 @@ int main(void)
         n_tot++;
         if (yhat != y) {
             n_err++;
-            printf("Error: True class: %d, Estimation: %d\n", y, yhat);
+            if (verbose) {
+                printf("Error: True class: %d, Estimation: %d\n", y, yhat);
+            }
         }
 
         // free the sample up again
