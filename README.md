@@ -21,7 +21,7 @@ $ source activate hdlib-env
 
 ## Optimizations
 
-- [x] CPU
+- [x] CPU (bit packing, cicular buffers, hamming distance LUT)
 - [x] GPU with global memory
 - [x] GPU with shared memory
 - [x] GPU with thread-local memory
