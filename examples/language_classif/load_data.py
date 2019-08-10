@@ -127,6 +127,9 @@ class load_data:
             char_array = np.array((2,), dtype=np.uint8)
         return char_array.reshape(1, -1), np.array(self._tr_idx - 1).reshape(1)
 
+    def get_test_item_num(self):
+        return self._n_test_labels
+        
     def get_test_item(self):
         if self._test_idx < self._n_test_labels:
             fname = self._testList[self._test_idx]
@@ -159,6 +162,7 @@ class load_data:
             num = self._n_test_labels
 
         for i in range(num):
+            print(f'storing test data... {i/(num-1):4.0%}', end='\r')
             X, y = self.get_test_item()
 
             n_samples, n_x = X.shape
@@ -178,3 +182,4 @@ class load_data:
                 for feature in X[0]:
                     # TODO change to uint8_t
                     _f.write(struct.pack("B", feature.item()))
+        print()
