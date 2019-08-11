@@ -4,104 +4,15 @@
 
 #include "hd_encoder.h"
 
-// Choose type of shift used. Possibilities: CIRCSHIFT_NAIVE, CIRCSHIFT_WORD, CIRCSHIFT_BIT
-#define CIRCSHIFT_BIT
-
-// TODO: optimise shifts by always shifting by 1 to the right?
-
-void circshift_naive(block_t * const arr, const int n_blk, const int n)
+void circshift(block_t * const arr, const int n_blk)
 {
-    if (n > 0)
+    const int shift = 1;
+    const int shift_carry = sizeof(block_t) * 8 - shift;
+    int i;
+    for (i = 0; i < n_blk; i++)
     {
-        // shift left
-        int shift = n;
-        int shift_carry = sizeof(block_t) * 8 - n;
-        block_t carry = arr[n_blk-1] >> shift_carry;
-        block_t tmp;
-        int i;
-        for (i = 0; i < n_blk; i++)
-        {
-            tmp = arr[i];
-            arr[i] = (arr[i] << shift) | carry;
-            carry = tmp >> shift_carry;
-        }
+        arr[i] = (arr[i] << shift) | (arr[i] >> shift_carry);
     }
-    if (n < 0)
-    {
-        // shift right
-        int shift = -n;
-        int shift_carry = sizeof(block_t) * 8 + n;
-        block_t carry = arr[n_blk-1] << shift_carry;
-        block_t tmp;
-        int i;
-        for (i = 0; i < n_blk; i++)
-        {
-            tmp = arr[i];
-            arr[i] = (arr[i] >> shift) | carry;
-            carry = tmp << shift_carry;
-        }
-    }
-}
-
-void circshift_word(block_t * const arr, const int n_blk, const int n)
-{
-    if (n > 0)
-    {
-        // shift right
-        int shift = n;
-        block_t tmp[shift];
-        memcpy(tmp, arr + (n_blk - shift), shift * sizeof arr[0]);
-        memcpy(arr + shift, arr, (n_blk - shift) * sizeof arr[0]);
-        memcpy(arr, tmp, shift * sizeof arr[0]);
-    }
-    if (n < 0)
-    {
-        // shift left
-        int shift = -n;
-        block_t tmp[shift];
-        memcpy(tmp, arr, shift * sizeof arr[0]);
-        memcpy(arr, arr + shift, (n_blk - shift) * sizeof arr[0]);
-        memcpy(arr + (n_blk - shift), tmp, shift * sizeof arr[0]);
-    }
-}
-
-void circshift_bit(block_t * const arr, const int n_blk, const int n)
-{
-    if (n > 0)
-    {
-        // shift left
-        int shift = n;
-        int shift_carry = sizeof(block_t) * 8 - n;
-        int i;
-        for (i = 0; i < n_blk; i++)
-        {
-            arr[i] = (arr[i] << shift) | (arr[i] >> shift_carry);
-        }
-    }
-    if (n < 0)
-    {
-        // shift right
-        int shift = -n;
-        int shift_carry = sizeof(block_t) * 8 + n;
-        int i;
-        for (i = 0; i < n_blk; i++)
-        {
-            arr[i] = (arr[i] >> shift) | (arr[i] << shift_carry);
-        }
-    }
-}
-
-void circshift(block_t * const arr, const int n_blk, const int n)
-{
-#if defined CIRCSHIFT_NAIVE
-    circshift_naive(arr, n_blk, n);
-#elif defined CIRCSHIFT_WORD
-    circshift_word(arr, n_blk, n);
-#elif defined CIRCSHIFT_BIT
-    circshift_bit(arr, n_blk, n);
-#else
-    circshift_word(arr, n_blk, n);
-#endif
 }
 
 void hd_encoder_setup_device(struct hd_encoder_t * const state) {
@@ -120,7 +31,6 @@ void hd_encoder_free(
 
 
 // overall speedup ideas:
-// - perform circular shift locally, e.g. every 32 entries
 // - split HD vectors into blocks and encode large inputs in chunks, i.e.
 //   for D=10000 encode the whole input using first 1000 vector elements,
 //   than next 1000 etc.
@@ -144,7 +54,7 @@ void hd_encoder_encode_ngramm(
     {
         if (i != *p_head)
         {
-            circshift(&buf[n_blk * i], n_blk, 1);
+            circshift(&buf[n_blk * i], n_blk);
         }
     }
 
