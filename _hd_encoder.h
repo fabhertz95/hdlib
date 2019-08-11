@@ -78,9 +78,13 @@ void hd_encoder_encode (
     const int n_x
 );
 
+void hd_encoder_clip(
+    struct hd_encoder_t * const state
+);
+
 // thresholds the in buffer at half count,
 // and packs the output into the out buffer
-void hd_encoder_clip(
+void clip(
     const uint32_t * const in,
     const int n_in,
     const int count,

@@ -277,7 +277,8 @@ extern "C" void hd_encoder_encode (
     state->ngramm_sum_count += n_x - (state->ngramm - 1);
 }
 
-extern "C" void hd_encoder_clip(
+// TODO merge functions in common with CPU implementation
+extern "C" void clip(
     const uint32_t * const in,
     const int n_in,
     const int count,
@@ -324,4 +325,16 @@ extern "C" void hd_encoder_clip(
         }
     }
 
+}
+
+extern "C" void hd_encoder_clip(
+    struct hd_encoder_t * const state
+)
+{
+    clip(
+        state->ngramm_sum_buffer,
+        sizeof(block_t) * 8 * state->n_blk,
+        state->ngramm_sum_count,
+        state->ngramm_buffer
+    );
 }

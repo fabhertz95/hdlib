@@ -43,7 +43,7 @@ void hd_classifier_threshold(
     class_t class;
     for (class = 0; class < state->n_class; class++)
     {
-        hd_encoder_clip(
+        clip(
             state->class_vec_sum + class * state->n_blk * sizeof(block_t) * 8,
             state->n_blk * sizeof(block_t) * 8,
             state->class_vec_cnt[class],
@@ -77,14 +77,7 @@ class_t hd_classifier_predict(
         hd_encoder_encode(encoder_state, x, n_x);
     }
 
-    // TODO: move rename hd_encoder_clip to clip
-    // and implement this call as hd_encoder_clip
-    hd_encoder_clip(
-        encoder_state->ngramm_sum_buffer,
-        sizeof(block_t) * 8 * encoder_state->n_blk,
-        encoder_state->ngramm_sum_count,
-        encoder_state->ngramm_buffer
-    );
+    hd_encoder_clip(encoder_state);
 
     int best_score = INT_MAX;
     class_t best_class;
@@ -145,14 +138,7 @@ void hd_classifier_predict_batch(
     // for every sample in the batch, clip and do inference
     //int i;
     for (i = 0; i < batch_size; i++) {
-        // TODO: move rename hd_encoder_clip to clip
-        // and implement this call as hd_encoder_clip
-        hd_encoder_clip(
-            encoder_states[i].ngramm_sum_buffer,
-            sizeof(block_t) * 8 * encoder_states[i].n_blk,
-            encoder_states[i].ngramm_sum_count,
-            encoder_states[i].ngramm_buffer
-        );
+        hd_encoder_clip(&encoder_states[i]);
 
         int best_score = INT_MAX;
         class_t best_class;

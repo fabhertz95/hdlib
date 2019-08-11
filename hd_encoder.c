@@ -251,7 +251,7 @@ void hd_encoder_encode (
     state->ngramm_sum_count += n_x - (state->ngramm - 1);
 }
 
-void hd_encoder_clip(
+void clip(
     const uint32_t * const in,
     const int n_in,
     const int count,
@@ -297,5 +297,16 @@ void hd_encoder_clip(
             out[i / 32] += ((uint32_t)(threshold - in[i])) >> 31;
         }
     }
+}
 
+void hd_encoder_clip(
+    struct hd_encoder_t * const state
+)
+{
+    clip(
+        state->ngramm_sum_buffer,
+        sizeof(block_t) * 8 * state->n_blk,
+        state->ngramm_sum_count,
+        state->ngramm_buffer
+    );
 }
