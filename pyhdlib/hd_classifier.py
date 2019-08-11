@@ -32,8 +32,8 @@ class hd_classifier_ext():
 
         self._ffi = cffi.FFI()
         self._ffi.cdef('\n'.join([
-            open(os.path.join(path, 'hd_encoder.h'), 'r').read(),
-            open(os.path.join(path, 'hd_classifier.h'), 'r').read()
+            open(os.path.join(path, '_hd_encoder.h'), 'r').read(),
+            open(os.path.join(path, '_hd_classifier.h'), 'r').read()
         ]))
         self._lib = self._ffi.dlopen(
             os.path.join(path, f'hdlib_{platform.machine()}.so')
