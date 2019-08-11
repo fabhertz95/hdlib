@@ -94,7 +94,7 @@ class hd_classifier_ext():
         self._class_vec_cnt = t.Tensor(self._n_classes).type(t.int32).zero_()
 
         self._classifier = self._ffi.new('struct hd_classifier_t *')
-        self._lib.hd_classifier_init(self._classifier, self._encoder.n_blk, n_classes)
+        self._lib.hd_classifier_init(self._classifier, self._encoder.n_blk, n_classes, 0)
         self._classifier.class_vec_sum = self._ffi.cast('block_t *', self._class_vec_sum.data_ptr())
         self._classifier.class_vec_cnt = self._ffi.cast('int *', self._class_vec_cnt.data_ptr())
 

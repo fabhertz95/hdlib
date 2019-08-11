@@ -5,6 +5,9 @@ typedef uint8_t class_t;
 
 struct hd_classifier_t
 {
+    // configuration
+    int profiling;
+
     // HD vector length
     int n_blk;
 
@@ -24,10 +27,15 @@ struct hd_classifier_t
 void hd_classifier_init(
     struct hd_classifier_t * const state,
     const int n_blk,
-    const int n_class
+    const int n_class,
+    const int profiling
 );
 
 void hd_classifier_free(
+    struct hd_classifier_t * const state
+);
+
+void hd_classifier_enable_profiling(
     struct hd_classifier_t * const state
 );
 

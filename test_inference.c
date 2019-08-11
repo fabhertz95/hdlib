@@ -56,7 +56,7 @@ feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
     return x;
 }
 
-int do_inference(int num_samples, int verbose) {
+int do_inference(int num_samples, int verbose, int profiling) {
     // prepare data
     struct hd_encoder_t encoder;
     struct hd_classifier_t classifier;
@@ -68,6 +68,11 @@ int do_inference(int num_samples, int verbose) {
     if (load(&classifier, &encoder, MODEL_FILE) != 0) {
         printf("Could not read model!\n");
         return 1;
+    }
+
+    if (profiling)
+    {
+        hd_classifier_enable_profiling(&classifier);
     }
 
     // setup the device (allocate device memory and copy item lookup to device)
@@ -121,7 +126,7 @@ int do_inference(int num_samples, int verbose) {
     return 0;
 }
 
-int do_batch_inference(int num_samples, int verbose) {
+int do_batch_inference(int num_samples, int verbose, int profiling) {
     // prepare data
     struct hd_encoder_t encoders[BATCH_SIZE];
     struct hd_classifier_t classifier;
@@ -133,6 +138,11 @@ int do_batch_inference(int num_samples, int verbose) {
     if (load(&classifier, &(encoders[0]), MODEL_FILE) != 0) {
         printf("Could not read model!\n");
         return 1;
+    }
+
+    if (profiling)
+    {
+        hd_classifier_enable_profiling(&classifier);
     }
 
     // setup the batch
@@ -201,16 +211,19 @@ int do_batch_inference(int num_samples, int verbose) {
 
 int main(int argc, char *argv[])
 {
-    int verbose = 0;
+    int verbose = 0, profiling = 0;
     
     int i;
     for (i = 0; i < argc; i++) {
         if (strcmp(argv[i], "-v") == 0) {
             verbose = 1;
         }
+        if (strcmp(argv[i], "-p") == 0) {
+            profiling = 1;
+        }
     }
 
     // set parameter to something positive to limit the number of samples processed
-    return do_batch_inference(-1, verbose);
-    //return do_inference(-1, verbose);
+    // return do_batch_inference(-1, verbose, profiling);
+    return do_inference(-1, verbose, profiling);
 }

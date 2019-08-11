@@ -11,13 +11,15 @@
 void hd_classifier_init(
     struct hd_classifier_t * const state,
     const int n_blk,
-    const int n_class
+    const int n_class,
+    const int profiling
 )
 {
     state->n_blk = n_blk;
     state->n_class = n_class;
     // class_vec_sum and class_vec_cnt are not initialised, they are set externally
     state->class_vec = malloc(n_class * n_blk * sizeof(block_t));
+    state->profiling = profiling;
 }
 
 void hd_classifier_free(
@@ -25,6 +27,13 @@ void hd_classifier_free(
 )
 {
     free(state->class_vec);
+}
+
+void hd_classifier_enable_profiling(
+    struct hd_classifier_t * const state
+)
+{
+    state->profiling = 1;
 }
 
 void hd_classifier_threshold(
@@ -50,14 +59,23 @@ class_t hd_classifier_predict(
     const int n_x
 )
 {
-    // Measure time here!
-    struct timespec tstart = {0,0};
-    struct timespec tend = {0,0};
-    clock_gettime(CLOCK_REALTIME, &tstart);
-    hd_encoder_encode(encoder_state, x, n_x);
-    clock_gettime(CLOCK_REALTIME, &tend);
-    long dtime = (1000000000 * tend.tv_sec + tend.tv_nsec) - (1000000000 * tstart.tv_sec + tstart.tv_nsec);
-    printf("%d, %ld\n", n_x, dtime / 1000);
+    if (state->profiling)
+    {
+        // profile encoding time
+        struct timespec tstart = {0,0};
+        struct timespec tend = {0,0};
+        clock_gettime(CLOCK_REALTIME, &tstart);
+
+        hd_encoder_encode(encoder_state, x, n_x);
+
+        clock_gettime(CLOCK_REALTIME, &tend);
+        long dtime = (1000000000 * tend.tv_sec + tend.tv_nsec) - (1000000000 * tstart.tv_sec + tstart.tv_nsec);
+        printf("%d, %ld\n", n_x, dtime / 1000);
+    }
+    else
+    {
+        hd_encoder_encode(encoder_state, x, n_x);
+    }
 
     // TODO: move rename hd_encoder_clip to clip
     // and implement this call as hd_encoder_clip
@@ -98,23 +116,31 @@ void hd_classifier_predict_batch(
     class_t * prediction
 )
 {
-    // do time measurement
-    struct timespec tstart = {0,0};
-    struct timespec tend = {0,0};
-    clock_gettime(CLOCK_REALTIME, &tstart);
-
-    hd_batch_encoder_encode(encoder_states, batch_size, x, n_x);
-
-    clock_gettime(CLOCK_REALTIME, &tend);
-    long dtime = (1000000000 * tend.tv_sec + tend.tv_nsec) - (1000000000 * tstart.tv_sec + tstart.tv_nsec);
-
-    // compute total number of samples
-    int tot_n_x = 0;
     int i;
-    for (i = 0; i < batch_size; i++) {
-        tot_n_x += n_x[i];
+
+    if (state->profiling)
+    {
+        // profile encoding time
+        struct timespec tstart = {0,0};
+        struct timespec tend = {0,0};
+        clock_gettime(CLOCK_REALTIME, &tstart);
+
+        hd_batch_encoder_encode(encoder_states, batch_size, x, n_x);
+        
+        clock_gettime(CLOCK_REALTIME, &tend);
+        long dtime = (1000000000 * tend.tv_sec + tend.tv_nsec) - (1000000000 * tstart.tv_sec + tstart.tv_nsec);
+    
+        // compute total number of samples
+        int tot_n_x = 0;
+        for (i = 0; i < batch_size; i++) {
+            tot_n_x += n_x[i];
+        }
+        printf("%d, %ld\n", tot_n_x, dtime / 1000);
     }
-    printf("%d, %ld\n", tot_n_x, dtime / 1000);
+    else
+    {
+        hd_batch_encoder_encode(encoder_states, batch_size, x, n_x);
+    }
 
     // for every sample in the batch, clip and do inference
     //int i;
@@ -238,7 +264,7 @@ int load(
            s_enc->n_items);
 
     // now, allocate the necessary memory
-    hd_classifier_init(s_classif, s_classif->n_blk, s_classif->n_class);
+    hd_classifier_init(s_classif, s_classif->n_blk, s_classif->n_class, 0);
     hd_encoder_init(s_enc, s_enc->n_blk, s_enc->ngramm, s_enc->n_items);
     // TODO This line above also initializes the item lookup!
 
