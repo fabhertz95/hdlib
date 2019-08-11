@@ -16,9 +16,6 @@ extern "C" {
 #define RAND_BYTES 1
 #endif
 
-// number of threads per block in the grid
-#define NUM_THREADS_IN_BLOCK 128
-
 #define MAX_NUM_ITEMS 32
 #define MAX_NGRAMM 8
 
