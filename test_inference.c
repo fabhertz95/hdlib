@@ -17,11 +17,11 @@
 #define TEST_FOLDER_LEN 48
 #define TEST_SAMPLE_NAME "sample_00000"
 #define TEST_SAMPLE_NAME_LEN 12
-#define TEST_SAMPLE_NAME_IDX TEST_FOLDER_LEN + 7
+#define TEST_SAMPLE_NAME_IDX (TEST_FOLDER_LEN + 7)
 
 # define BATCH_SIZE 16
 
-char current_filename[TEST_FOLDER_LEN + TEST_SAMPLE_NAME_LEN + 1];
+char current_filename[TEST_FOLDER_LEN + TEST_SAMPLE_NAME_LEN + 11];
 
 feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
 {
@@ -186,7 +186,7 @@ int do_batch_inference(int num_samples, int verbose, int profiling) {
             if (yhat[i] != y[i]) {
                 n_err++;
                 if (verbose) {
-                    printf("Error: True class: %d, Estimation: %d\n", y, yhat);
+                    printf("Error: True class: %d, Estimation: %d\n", y[i], yhat[i]);
                 }
             }
 
