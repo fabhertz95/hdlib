@@ -224,6 +224,6 @@ int main(int argc, char *argv[])
     }
 
     // set parameter to something positive to limit the number of samples processed
-    // return do_batch_inference(-1, verbose, profiling);
-    return do_inference(-1, verbose, profiling);
+    return do_batch_inference(-1, verbose, profiling);
+    // return do_inference(-1, verbose, profiling);
 }

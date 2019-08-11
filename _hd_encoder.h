@@ -1,7 +1,6 @@
 // number of threads per block in the grid
 #define NUM_THREADS_IN_BLOCK 128
 
-// TODO: use uint8_t for feature_t
 // input vector feature
 typedef uint8_t feature_t;
 

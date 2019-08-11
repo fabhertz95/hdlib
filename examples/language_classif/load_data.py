@@ -180,6 +180,5 @@ class load_data:
                 _f.write(struct.pack("<i", X.shape[1]))
                 # write data
                 for feature in X[0]:
-                    # TODO change to uint8_t
                     _f.write(struct.pack("B", feature.item()))
         print()
