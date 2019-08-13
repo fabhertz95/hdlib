@@ -122,6 +122,79 @@ int do_measurement(int from, int to, int step, int num_repeat) {
     return 0;
 }
 
+int do_batch_measurement(int from, int to, int step, int num_repeat) {
+    if (num_repeat <= 0) num_repeat = 1;
+
+    // prepare data
+    struct hd_encoder_t encoders[BATCH_SIZE];
+    struct hd_classifier_t classifier;
+
+    // initialize hamming distance
+    hamming_distance_init();
+
+    // load data (encoder data into the first encoder
+    if (load(&classifier, &(encoders[0]), MODEL_FILE) != 0) {
+        printf("Could not read model!\n");
+        return 1;
+    }
+
+    hd_classifier_enable_profiling(&classifier);
+
+    // setup the batch
+    hd_batch_encoder_init(encoders, BATCH_SIZE);
+
+    // setup the device (allocate device memory and copy item lookup to device)
+    hd_batch_encoder_setup_device(encoders, BATCH_SIZE);
+    // model is now loaded and ready to do inference!
+
+    // prepare current_filename
+    strcpy(current_filename, TEST_FOLDER);
+    strcat(current_filename, TEST_SAMPLE_NAME);
+
+    // prepare data
+    int n_x[BATCH_SIZE];
+    feature_t * x[BATCH_SIZE];
+    class_t y[BATCH_SIZE];
+    class_t yhat[BATCH_SIZE];
+
+    // load the measurement data multiple times
+    int sample;
+    for (sample = 0; sample < BATCH_SIZE; sample++) {
+        x[sample] = load_measurement_sample(&(n_x[sample]), &(y[sample]));
+        if (x[sample] == NULL) {
+            printf("Cannot load measurement sample!\n");
+        }
+    }
+    int original_n_x = n_x[0];
+
+    int cur_len = from;
+    while(cur_len <= to) {
+        int i;
+        for (i = 0; i < num_repeat; i++) {
+            // prepare n_x vector to all be cur_len
+            for (sample = 0; sample < BATCH_SIZE; sample++) {
+                n_x[sample] = cur_len;
+            }
+            // make prediction
+            hd_classifier_predict_batch(&classifier, encoders, BATCH_SIZE, (const feature_t**)x, n_x, yhat);
+        }
+        // increment step
+        cur_len += step;
+        if (original_n_x < cur_len) break;
+    }
+
+    // free up memory of measurement samples
+    for (sample = 0; sample < BATCH_SIZE; sample++) {
+        free(x[sample]);
+    }
+
+    // free up all memory
+    hd_batch_encoder_free(encoders, BATCH_SIZE);
+    hd_classifier_free(&classifier);
+
+    return 0;
+}
+
 int do_inference(int num_samples, int verbose, int profiling) {
     // prepare data
     struct hd_encoder_t encoder;
@@ -308,4 +381,5 @@ int main(int argc, char *argv[])
     //return do_batch_inference(num_samples, verbose, profiling);
     return do_inference(num_samples, verbose, profiling);
     //return do_measurement(10, 10000, 10, num_samples);
+    //return do_batch_measurement(5, 625, 1, num_samples);
 }
