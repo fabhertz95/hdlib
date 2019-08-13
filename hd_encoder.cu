@@ -81,7 +81,7 @@ __global__ void hd_encoder_kernel(
     // copy values back to ngramm_sum_buffer
     // TODO reorder sum buffer such that we can just use memcopy
     for (s_i = 0; s_i < sizeof(uint32_t) * 8; s_i++) {
-        ngramm_sum_buffer[blk * sizeof(uint32_t) * 8 + s_i] = l_ngramm_sum_buffer[s_i];
+        ngramm_sum_buffer[s_i * n_blk + blk] = l_ngramm_sum_buffer[s_i];
     }
 }
 
@@ -147,7 +147,7 @@ __global__ void hd_encoder_3gramm_kernel(
     // copy values back to ngramm_sum_buffer
     // TODO reorder sum buffer such that we can just use memcopy
     for (s_i = 0; s_i < sizeof(uint32_t) * 8; s_i++) {
-        ngramm_sum_buffer[blk * sizeof(uint32_t) * 8 + s_i] = l_ngramm_sum_buffer[s_i];
+        ngramm_sum_buffer[s_i * n_blk + blk] = l_ngramm_sum_buffer[s_i];
     }
 }
 
@@ -249,39 +249,15 @@ void clip(
 
     memset(out, 0, (n_in + sizeof(block_t) * 8 - 1) / (sizeof(block_t) * 8));
 
-    // add a random vector to break ties if case an even number of elements were summed
-    if (count % 2 == 0)
-    {
-        // TODO: can we reuse randomness? e.g. have a fixed length of say 32 bytes
-        uint32_t random_vector[(n_in + 31) / 32];
-        int i;
-        for (i = 0; i > sizeof(random_vector) / sizeof(random_vector[0]); i++)
-        {
-            random_vector[i] = 0;
-            int j;
-            for (j = 0; j < RAND_BYTES; j++)
-            {
-                random_vector[i] <<= 8 * RAND_BYTES;
-                random_vector[i] += rand() & ((1u << 8 * RAND_BYTES) - 1u);
-            }
-        }
+    // we ignore the randomization here...
 
-        for (i = 0; i < n_in; i++)
-        {
-            int in_with_rand = in[i] + (random_vector[i / 32] & 1);
-            random_vector[i / 32] >>= 1;
-            out[i / 32] <<= 1;
-            // set to 1 if above threshold and 0 otherwise
-            out[i / 32] += ((uint32_t)(threshold - in_with_rand)) >> 31;
-        }
-    }
-    else
-    {
-        int i;
-        for (i = 0; i < n_in; i++)
-        {
-            out[i / 32] <<= 1;
-            out[i / 32] += ((uint32_t)(threshold - in[i])) >> 31;
+    int n_blk = n_in / 32;
+    int blk;
+    for (blk = 0; blk < n_blk; blk++) {
+        int s_i;
+        for (s_i = 0; s_i < 32; s_i++) {
+            out[blk] <<= 1;
+            out[blk] += ((uint32_t)(threshold - in[s_i * n_blk + blk])) >> 31;
         }
     }
 

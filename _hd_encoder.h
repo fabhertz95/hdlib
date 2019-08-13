@@ -10,11 +10,11 @@ typedef uint32_t block_t;
 // struct to store pointers on the device, which remain
 struct device_data_t
 {
-    // shape: [ngramm, n_blk]
+    // shape: [n_blk, ngramm]
     block_t * ngramm_buffer;
     // shape: [n_blk * 32]
     uint32_t * ngramm_sum_buffer;
-    // shape: [n_items, n_blk]
+    // shape: [n_blk, n_items]
     block_t * item_lookup;
 };
 
@@ -31,17 +31,17 @@ struct hd_encoder_t
     block_t * ngramm_buffer;
 
     // encoded n-gramm summation buffer
-    // shape: [n_blk * 32]
+    // shape: GPU: [n_blk, 32], CPU: [32 * n_blk]
     uint32_t * ngramm_sum_buffer;
     int ngramm_sum_count;
 
     // HD vector n-gramm circular buffer (head: last copied item)
-    // shape: [ngramm, n_blk]
+    // shape: GPU: [n_blk, ngramm], CPU: [ngramm, n_blk]
     block_t * item_buffer;
     int item_buffer_head;
 
     // HD vector lookup table
-    // shape: [n_items, n_blk]
+    // shape: GPU: [n_blk, n_items], CPU: [n_items, n_blk]
     block_t * item_lookup;
     int n_items;
 

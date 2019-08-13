@@ -4,16 +4,6 @@
 
 #include "hd_encoder.h"
 
-// rand() generates a random number between 0 and RAND_MAX, which is
-// guaranteed to be no less than 32767 on any standard implementation.
-#if (RAND_MAX >= (1u << 32) - 1u)
-#define RAND_BYTES 4
-#elif (RAND_MAX >= (1u << 16) - 1u)
-#define RAND_BYTES 2
-#elif (RAND_MAX >= (1u << 8) - 1u)
-#define RAND_BYTES 1
-#endif
-
 void hd_encoder_init(
     struct hd_encoder_t * const state,
     const int n_blk,
