@@ -18,19 +18,17 @@
 #define TEST_SAMPLE_NAME "sample_00000"
 #define TEST_SAMPLE_NAME_LEN 12
 #define TEST_SAMPLE_NAME_IDX (TEST_FOLDER_LEN + 7)
+#define MEASUREMENT_SAMPLE_NAME "measurement_sample"
+#define MEASUREMENT_SAMPLE_NAME_LEN 18
 
 # define BATCH_SIZE 16
 
 char current_filename[TEST_FOLDER_LEN + TEST_SAMPLE_NAME_LEN + 11];
 
-feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
+feature_t * load_binary_sample(char * filename, int * n_x, class_t * y)
 {
-    // prepare filename
-    sprintf(current_filename + TEST_SAMPLE_NAME_IDX, "%05d", sample_idx);
-    // increment sample_idx
-
     // try to load the file
-    FILE * fp = fopen(current_filename, "rb");
+    FILE * fp = fopen(filename, "rb");
     if (fp == NULL) return NULL;
 
     int bytes_read = 0;
@@ -54,6 +52,74 @@ feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
 
     fclose(fp);
     return x;
+}
+
+feature_t * load_test_sample(int sample_idx, int * n_x, class_t * y)
+{
+    // prepare filename
+    sprintf(current_filename + TEST_SAMPLE_NAME_IDX, "%05d", sample_idx);
+    return load_binary_sample(current_filename, n_x, y);
+}
+
+feature_t * load_measurement_sample(int * n_x, class_t * y) {
+    char filename[TEST_FOLDER_LEN + MEASUREMENT_SAMPLE_NAME_LEN + 11];
+    strcpy(filename, TEST_FOLDER);
+    strcat(filename, MEASUREMENT_SAMPLE_NAME);
+    return load_binary_sample(filename, n_x, y);
+}
+
+int do_measurement(int from, int to, int step, int num_repeat) {
+    if (num_repeat <= 0) num_repeat = 1;
+
+    // prepare data
+    struct hd_encoder_t encoder;
+    struct hd_classifier_t classifier;
+
+    // initialize hamming distance
+    hamming_distance_init();
+
+    // load
+    if (load(&classifier, &encoder, MODEL_FILE) != 0) {
+        printf("Could not read model!\n");
+        return 1;
+    }
+
+    hd_classifier_enable_profiling(&classifier);
+
+    // setup the device (allocate device memory and copy item lookup to device)
+    hd_encoder_setup_device(&encoder);
+    // model is now loaded and ready to do inference!
+
+    // prepare data
+    int n_x;
+    class_t y;
+    feature_t * x = load_measurement_sample(&n_x, &y);
+    if (x == NULL) {
+        printf("no data found!\n");
+        return 1;
+    }
+
+    int cur_len = from;
+
+    while(cur_len <= to) {
+        int i;
+        for (i = 0; i < num_repeat; i++) {
+            // make prediction
+            hd_classifier_predict(&classifier, &encoder, x, cur_len);
+        }
+        // increment step
+        cur_len += step;
+        if (n_x < cur_len) break;
+    }
+
+    // free the sample up again
+    free(x);
+
+    // free up all memory
+    hd_encoder_free(&encoder);
+    hd_classifier_free(&classifier);
+
+    return 0;
 }
 
 int do_inference(int num_samples, int verbose, int profiling) {
@@ -225,20 +291,21 @@ int main(int argc, char *argv[])
             // increment i to get to the next argument
             i += 1;
             if (i == argc) {
-                printf("The '-n' argument requires a number!");
+                printf("The '-n' argument requires a number!\n");
                 return 1;
             }
             char * p_end;
             // parse the input to a integer
             num_samples = (int) strtol(argv[i], &p_end, 10);
             if (num_samples == 0) {
-                printf("A positive number is required for the '-n' argument");
+                printf("A positive number is required for the '-n' argument\n");
                 return 1;
             }
         }
     }
 
     // set parameter to something positive to limit the number of samples processed
-    return do_batch_inference(num_samples, verbose, profiling);
-    // return do_inference(num_samples, verbose, profiling);
+    //return do_batch_inference(num_samples, verbose, profiling);
+    return do_inference(num_samples, verbose, profiling);
+    //return do_measurement(10, 10000, 10, num_samples);
 }

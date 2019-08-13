@@ -148,9 +148,20 @@ class load_data:
 
         return char_array.reshape(1, -1), np.array(label).reshape(1)
 
+    def store_sample(self, filename, X, y):
+        import struct
+        assert X.shape[0] == 1
+        with open(filename, "wb") as _f:
+            # wirte label
+            _f.write(struct.pack("B", y.item()))
+            # write shape
+            _f.write(struct.pack("<i", X.shape[1]))
+            # write data
+            for feature in X[0]:
+                _f.write(struct.pack("B", feature.item()))
+
     def store_test_data(self, foldername, num=0):
 
-        import struct
         import os
 
         # make sure that the folder exists
@@ -165,20 +176,17 @@ class load_data:
             print(f'storing test data... {i/(num-1):4.0%}', end='\r')
             X, y = self.get_test_item()
 
-            n_samples, n_x = X.shape
-            assert n_samples == 1
-
             if y == -1:
                 break
 
             filename = os.path.join(foldername, f"sample_{i:05d}")
+            self.store_sample(filename, X, y)
 
-            with open(filename, "wb") as _f:
-                # wirte label
-                _f.write(struct.pack("B", y.item()))
-                # write shape
-                _f.write(struct.pack("<i", X.shape[1]))
-                # write data
-                for feature in X[0]:
-                    _f.write(struct.pack("B", feature.item()))
         print()
+
+        # store one training sample for measurement
+        print('storing measurement sample')
+        X, y = self.get_train_item()
+        if y != -1:
+            filename = os.path.join(foldername, f"measurement_sample")
+            self.store_sample(filename, X, y)
