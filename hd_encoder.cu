@@ -175,6 +175,8 @@ extern "C" void hd_encoder_free(struct hd_encoder_t * const state) {
     free(state->ngramm_sum_buffer);
     free(state->item_buffer);
     free(state->item_lookup);
+
+    cudaDeviceReset();
 }
 
 extern "C" void hd_encoder_encode (

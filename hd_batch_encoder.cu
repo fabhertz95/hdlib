@@ -90,6 +90,8 @@ void hd_batch_encoder_free(
             cudaFree(states[i].device.item_lookup);
         }
     }
+
+    cudaDeviceReset();
 }
 
 void hd_batch_encoder_encode (
