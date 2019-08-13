@@ -46,11 +46,11 @@ $ source activate hdlib-env
 ```
 | D pack | characters in input sample --> | Block |
 |--------|--------------------------------|-------|
-| 0      |                                |       |
-| :      |                                |       |
-| :      | 128 threads                    | 0     |
-| :      |                                |       |
-| 127    |                                |       |
+| 0      |                                |       |  ^
+| :      |                                |       |  |
+| :      | 128 threads                    | 0     | 128
+| :      |                                |       |  |
+| 127    |                                |       |  v
 |--------|--------------------------------|-------|
 | 128    |                                |       |
 | :      |                                |       |
@@ -64,17 +64,18 @@ $ source activate hdlib-env
 | :      |                                |       |
 | 312    |                                |       |
 |--------|--------------------------------|-------|
+          <------------- n_x ------------>
 ```
 
-### input-data-parallelism
+### `m`-input-data-parallelism
 
 ```
 | D pack | characters in input sample --> | Block |
-|--------|--------------------------------|-------| 
-| 0      |                |               |       |
-| :      | 64 threads     | 64 threads    | 0     |
-| 63     |                |               |       |
-|--------|--------------------------------|-------|
+|--------|--------------------------------|-------|   ^
+| 0      |                |               |       |   |
+| :      | 64 threads     | 64 threads    | 0     | 128 / m
+| 63     |                |               |       |   |
+|--------|--------------------------------|-------|   v
 | 64     |                |               |       |
 | :      | 64 threads     | 64 threads    | 1     |
 | 127    |                |               |       |
@@ -91,10 +92,26 @@ $ source activate hdlib-env
 | :      | 64 threads     | 64 threads    | 4     |
 | 319    |                |               |       |
 |--------|--------------------------------|-------|
+          <--thread_n_x-->
+
+          ^               ^
+          |               |
+       start_0         start_1
 ```
 
 - input-dimension division `m`.
 - HD dimension D (packed) for each thread block: `128 / m`
+- Input intervalls
+  - First two samples for each thread do not produce an output.
+    We also need to overlap the range, so that no result is lost during this process.
+    We divide the number of valid encoded ngramms (`ngramm_sum_count = n_x - (ngramm - 1)`) equally amongst the threads.
+  - `thread_n_x`: Number of input features for each thread
+    - for `threadIdx.y < m`: `floor((n_x - (ngramm-1)) / m)`
+    - for `threadIdx.y = m`: `n_x - (m - 1) * floor(n_x / m)`
+  - Start-index for threads with `threadIdx.y = y`:
+    - `start_y = y * floor((n_x - (ngramm-1)) / m)`
+  - End-index for threads with `threadIdx.y = y`:
+    - `end_y = (y + 1) * floor((n_x - (ngramm-1)) / m) + (ngramm - 2)`
 - Shared memory size (per block):
   - `item_lookup`: `(n_items * 128 / m) * 4 [bytes]`
   - `ngramm_sum_buffer`: `((32 * 128 / m) * m) * 4 [bytes] = (32 * 128) * 4 [bytes] `
