@@ -211,7 +211,7 @@ int do_batch_inference(int num_samples, int verbose, int profiling) {
 
 int main(int argc, char *argv[])
 {
-    int verbose = 0, profiling = 0;
+    int verbose = 0, profiling = 0, num_samples = -1;
     
     int i;
     for (i = 0; i < argc; i++) {
@@ -221,9 +221,24 @@ int main(int argc, char *argv[])
         if (strcmp(argv[i], "-p") == 0) {
             profiling = 1;
         }
+        if (strcmp(argv[i], "-n") == 0) {
+            // increment i to get to the next argument
+            i += 1;
+            if (i == argc) {
+                printf("The '-n' argument requires a number!");
+                return 1;
+            }
+            char * p_end;
+            // parse the input to a integer
+            num_samples = (int) strtol(argv[i], &p_end, 10);
+            if (num_samples == 0) {
+                printf("A positive number is required for the '-n' argument");
+                return 1;
+            }
+        }
     }
 
     // set parameter to something positive to limit the number of samples processed
-    return do_batch_inference(-1, verbose, profiling);
-    // return do_inference(-1, verbose, profiling);
+    return do_batch_inference(num_samples, verbose, profiling);
+    // return do_inference(num_samples, verbose, profiling);
 }
