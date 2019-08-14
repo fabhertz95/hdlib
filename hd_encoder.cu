@@ -84,6 +84,80 @@ __global__ void hd_encoder_kernel(
     }
 }
 
+// Wrapper function to call the kernel. Input data (x) must already be copied to the device.
+// if stream is NULL, then the default stream is used.
+extern "C" void hd_encoder_call_kernel(
+    struct hd_encoder_t * const state,
+    const feature_t * d_x,
+    const int n_x,
+    cudaStream_t stream = NULL
+)
+{
+    // compute the number of blocks used
+    int num_blocks = (state->n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
+
+    switch(state->ngramm) {
+        case 2:
+            hd_encoder_kernel<2><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        case 3:
+            hd_encoder_kernel<3><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        case 4:
+            hd_encoder_kernel<4><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        case 5:
+            hd_encoder_kernel<5><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        case 6:
+            hd_encoder_kernel<6><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        case 7:
+            hd_encoder_kernel<7><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        case 8:
+            hd_encoder_kernel<8><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
+                state->n_blk,
+                state->device.ngramm_sum_buffer,
+                state->device.item_lookup,
+                state->n_items,
+                d_x, n_x);
+            break;
+        default:
+            printf("Error! ngramm must be between 2 and 8, but it was %d\n", state->ngramm);
+    }
+}
+
 extern "C" void hd_encoder_setup_device(struct hd_encoder_t * const state) {
     // allocate memory
     cudaMalloc(&(state->device.item_lookup), state->n_items * state->n_blk * sizeof(block_t));
@@ -119,8 +193,6 @@ extern "C" void hd_encoder_encode (
 )
 {
     const int n_blk = state->n_blk;
-    const int ngramm = state->ngramm;
-    const int n_items = state->n_items;
 
     // reset the sum count
     state->ngramm_sum_count = 0;
@@ -132,35 +204,7 @@ extern "C" void hd_encoder_encode (
     cudaMemcpy(d_x, x, n_x * sizeof(feature_t), cudaMemcpyHostToDevice);
 
     // call the kernel
-    int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
-
-    uint32_t * d_sum_buffer = state->device.ngramm_sum_buffer;
-    block_t * d_item_lookup = state->device.item_lookup;
-    switch(ngramm) {
-        case 2:
-            hd_encoder_kernel<2><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        case 3:
-            hd_encoder_kernel<3><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        case 4:
-            hd_encoder_kernel<4><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        case 5:
-            hd_encoder_kernel<5><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        case 6:
-            hd_encoder_kernel<6><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        case 7:
-            hd_encoder_kernel<7><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        case 8:
-            hd_encoder_kernel<8><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
-            break;
-        default:
-            printf("Error! ngramm must be between 2 and 8, but it was %d\n", ngramm);
-    }
+    hd_encoder_call_kernel(state, d_x, n_x);
 
     cudaDeviceSynchronize();
 

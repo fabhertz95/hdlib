@@ -17,6 +17,13 @@ __global__ void hd_encoder_kernel(
     const int n_x
 );
 
+extern "C" void hd_encoder_call_kernel(
+    struct hd_encoder_t * const state,
+    const feature_t * d_x,
+    const int n_x,
+    cudaStream_t stream = NULL
+);
+
 extern "C" void hd_batch_encoder_init(
      struct hd_encoder_t * const states,
      const int batch_size
@@ -101,8 +108,6 @@ void hd_batch_encoder_encode (
     }
 
     const int n_blk = states[0].n_blk;
-    const int ngramm = states[0].ngramm;
-    const int n_items = states[0].n_items;
 
     // array for device pointers
     feature_t ** d_x = (feature_t**) malloc(sizeof(feature_t *) * batch_size);
@@ -118,34 +123,7 @@ void hd_batch_encoder_encode (
         cudaMemcpyAsync(d_x[i], x[i], n_x[i] * sizeof(feature_t), cudaMemcpyHostToDevice, streams[i]);
 
         // call the kernel
-        int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
-        uint32_t * d_sum_buffer = states[i].device.ngramm_sum_buffer;
-        block_t * d_item_lookup = states[i].device.item_lookup;
-        switch(ngramm) {
-            case 2:
-                hd_encoder_kernel<2><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            case 3:
-                hd_encoder_kernel<3><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            case 4:
-                hd_encoder_kernel<4><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            case 5:
-                hd_encoder_kernel<5><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            case 6:
-                hd_encoder_kernel<6><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            case 7:
-                hd_encoder_kernel<7><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            case 8:
-                hd_encoder_kernel<8><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
-                break;
-            default:
-                printf("Error! ngramm must be between 2 and 8, but it was %d\n", ngramm);
-        }
+        hd_encoder_call_kernel(&(states[i]), d_x[i], n_x[i], streams[i]);
 
         // copy the output (ngramm_sum_buffer) back from the device
         cudaMemcpyAsync(
@@ -157,7 +135,7 @@ void hd_batch_encoder_encode (
         );
 
         // set the ngramm_sum_count
-        states[i].ngramm_sum_count += n_x[i] - (ngramm - 1);
+        states[i].ngramm_sum_count += n_x[i] - (states[i].ngramm - 1);
     }
 
     // wait until batch is complete
