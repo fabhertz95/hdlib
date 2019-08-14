@@ -39,7 +39,16 @@ $ source activate hdlib-env
 - [x] GPU with thread-local memory
 - [x] GPU with thread-local memory and batches (does not work well)
 
-## Blocks and Threads
+## Sources of parallelism
+
+HD vector encoding of n-gramms is an embarrasingly parallel problem. There are two major ways to split the computations to parallelise them:
+* HD vector can be split into arbitrarily short chunks to encode a single n-gramm in parallel
+    * simply rotating the whole HD vector for feature slightly widens the dependency to neighbouring HD vector chunks
+    * this can be prevented by rotating each feature within the chunk, as long as the chunk has no fewer elements than the n-gramm size
+    * processing each chunk reads the HD vectors and inputs (constant) and exclusively writes to a part of the output
+* input can be split into multiple chunks
+    * input lenghts range from a couple tens or hundreds of features during inference to millions of features during training
+    * each split is accompanied by an overlap of (n-gramm size - 1)
 
 ### No input-data-parallelism
 
@@ -53,15 +62,11 @@ $ source activate hdlib-env
 | 127    |                                |       |  v
 |--------|--------------------------------|-------|
 | 128    |                                |       |
-| :      |                                |       |
 | :      | 128 threads                    | 1     |
-| :      |                                |       |
 | 255    |                                |       |
 |--------|--------------------------------|-------|
 | 256    |                                |       |
-| :      |                                |       |
 | :      | 128 threads                    | 2     |
-| :      |                                |       |
 | 312    |                                |       |
 |--------|--------------------------------|-------|
           <------------- n_x ------------>
@@ -71,11 +76,13 @@ $ source activate hdlib-env
 
 ```
 | D pack | characters in input sample --> | Block |
-|--------|--------------------------------|-------|   ^
-| 0      |                |               |       |   |
+|--------|--------------------------------|-------|
+| 0      |                |               |       |   ^
+| :      |                |               |       |   |
 | :      | 64 threads     | 64 threads    | 0     | 128 / m
-| 63     |                |               |       |   |
-|--------|--------------------------------|-------|   v
+| :      |                |               |       |   |
+| 63     |                |               |       |   v
+|--------|--------------------------------|-------|
 | 64     |                |               |       |
 | :      | 64 threads     | 64 threads    | 1     |
 | 127    |                |               |       |
@@ -99,9 +106,9 @@ $ source activate hdlib-env
        start_0         start_1
 ```
 
-- input-dimension division `m`.
-- HD dimension D (packed) for each thread block: `128 / m`
-- Input intervalls
+- Input dimension division `m`
+- HD vector dimension D (packed) for each thread block: `128 / m`
+- Input intervals
   - First two samples for each thread do not produce an output.
     We also need to overlap the range, so that no result is lost during this process.
     We divide the number of valid encoded ngramms (`ngramm_sum_count = n_x - (ngramm - 1)`) equally amongst the threads.
