@@ -1,22 +1,14 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 extern "C" {
 #include "hd_batch_encoder.h"
 }
 
+template<int NGRAMM>
 __global__ void hd_encoder_kernel(
-    const int n_blk,
-    const int ngramm,
-    uint32_t * __restrict__ ngramm_sum_buffer,
-    const block_t * __restrict__ item_lookup,
-    const int n_items,
-    const feature_t * __restrict__ x,
-    const int n_x
-);
-
-__global__ void hd_encoder_3gramm_kernel(
     const int n_blk,
     uint32_t * __restrict__ ngramm_sum_buffer,
     const block_t * __restrict__ item_lookup,
@@ -127,25 +119,32 @@ void hd_batch_encoder_encode (
 
         // call the kernel
         int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
-        if (ngramm == 3) {
-            hd_encoder_3gramm_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(
-                n_blk,
-                states[i].device.ngramm_sum_buffer,
-                states[i].device.item_lookup,
-                n_items,
-                d_x[i],
-                n_x[i]
-            );
-        } else {
-            hd_encoder_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(
-                n_blk,
-                ngramm,
-                states[i].device.ngramm_sum_buffer,
-                states[i].device.item_lookup,
-                n_items,
-                d_x[i],
-                n_x[i]
-            );
+        uint32_t * d_sum_buffer = states[i].device.ngramm_sum_buffer;
+        block_t * d_item_lookup = states[i].device.item_lookup;
+        switch(ngramm) {
+            case 2:
+                hd_encoder_kernel<2><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            case 3:
+                hd_encoder_kernel<3><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            case 4:
+                hd_encoder_kernel<4><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            case 5:
+                hd_encoder_kernel<5><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            case 6:
+                hd_encoder_kernel<6><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            case 7:
+                hd_encoder_kernel<7><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            case 8:
+                hd_encoder_kernel<8><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, streams[i]>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x[i], n_x[i]);
+                break;
+            default:
+                printf("Error! ngramm must be between 2 and 8, but it was %d\n", ngramm);
         }
 
         // copy the output (ngramm_sum_buffer) back from the device

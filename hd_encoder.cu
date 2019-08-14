@@ -1,21 +1,21 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 extern "C" {
 #include "hd_encoder.h"
 }
 
 #define MAX_NUM_ITEMS 32
-#define MAX_NGRAMM 8
 
 // TODO: Stuff to optimize
 // * Copy one part of x to device, then compute it and copy the next part at the same time.
 //   Use different streams for each part of the input, and use cudaMemcopyAsync.
 // * make clip also on the gpu, using the data from before, and don't copy the ngramm_sum_buffer over.
+template<int NGRAMM>
 __global__ void hd_encoder_kernel(
     const int n_blk,
-    const int ngramm,
     uint32_t * __restrict__ ngramm_sum_buffer,
     const block_t * __restrict__ item_lookup,
     const int n_items,
@@ -32,13 +32,13 @@ __global__ void hd_encoder_kernel(
     }
 
     // prepare local memory
-    block_t l_ngramm_buffer[MAX_NGRAMM];
+    block_t l_ngramm_buffer[NGRAMM];
     uint32_t l_ngramm_sum_buffer[sizeof(uint32_t) * 8];
     block_t l_item_lookup[MAX_NUM_ITEMS];
 
     // reset ngramm_sum_buffer
     memset(l_ngramm_sum_buffer, 0, sizeof(l_ngramm_sum_buffer[0]) * 8 * sizeof(uint32_t));
-    memset(l_ngramm_buffer, 0, sizeof(l_ngramm_buffer[0]) * ngramm);
+    memset(l_ngramm_buffer, 0, sizeof(l_ngramm_buffer[0]) * NGRAMM);
 
     // load item_lookup
     uint32_t s_i; // iterator
@@ -56,7 +56,7 @@ __global__ void hd_encoder_kernel(
 
         // Shift the parts in in the item_buffer and add the new one
         int i;
-        for (i = ngramm - 1; i >= 1; i--) {
+        for (i = NGRAMM - 1; i >= 1; i--) {
             block_t previous = l_ngramm_buffer[i-1];
             l_ngramm_buffer[i] = (previous << 1) | (previous >> 31);
         }
@@ -65,12 +65,12 @@ __global__ void hd_encoder_kernel(
 
         // compute the encoded ngramm
         block_t tmp_ngramm_buffer = item;
-        for (i = 1; i < ngramm; i++) {
+        for (i = 1; i < NGRAMM; i++) {
             tmp_ngramm_buffer ^= l_ngramm_buffer[i];
         }
 
         // add to sum buffer
-        if (feat_idx >= ngramm - 1) {
+        if (feat_idx >= NGRAMM - 1) {
             int j;
             for (j = 0; j < sizeof(block_t) * 8; j++) {
                 l_ngramm_sum_buffer[j] += (tmp_ngramm_buffer >> j) & 1;
@@ -79,73 +79,6 @@ __global__ void hd_encoder_kernel(
     }
 
     // copy values back to ngramm_sum_buffer
-    // TODO reorder sum buffer such that we can just use memcopy
-    for (s_i = 0; s_i < sizeof(uint32_t) * 8; s_i++) {
-        ngramm_sum_buffer[s_i * n_blk + blk] = l_ngramm_sum_buffer[s_i];
-    }
-}
-
-// These functions are optimized for a specific ngramm. (speed up of around 30%)
-// TODO repeat this for different ngramms.
-__global__ void hd_encoder_3gramm_kernel(
-    const int n_blk,
-    uint32_t * __restrict__ ngramm_sum_buffer,
-    const block_t * __restrict__ item_lookup,
-    const int n_items,
-    const feature_t * __restrict__ x,
-    const int n_x
-)
-{
-    int ngramm = 3;
-
-    // compute the index of the block on which we must work
-    int blk = blockIdx.x*blockDim.x + threadIdx.x;
-
-    // exit if blk is outside of the range
-    if (blk >= n_blk) {
-        return;
-    }
-
-    // prepare local memory
-    block_t l_ngramm_buffer[3];
-    uint32_t l_ngramm_sum_buffer[sizeof(uint32_t) * 8];
-    block_t l_item_lookup[MAX_NUM_ITEMS];
-
-    // reset ngramm_sum_buffer
-    memset(l_ngramm_sum_buffer, 0, sizeof(l_ngramm_sum_buffer[0]) * 8 * sizeof(uint32_t));
-    memset(l_ngramm_buffer, 0, sizeof(l_ngramm_buffer[0]) * ngramm);
-
-    // load item_lookup
-    uint32_t s_i; // iterator
-    for (s_i = 0; s_i < n_items; s_i++) {
-        l_item_lookup[s_i] = item_lookup[s_i * n_blk + blk];
-    }
-
-    // loop over every single feature
-    int feat_idx;
-    for (feat_idx = 0; feat_idx < n_x; feat_idx++) {
-        // get position of the item in the lookup table
-        feature_t item_lookup_idx = x[feat_idx];
-        // get the part of the item
-        block_t item = l_item_lookup[item_lookup_idx];
-
-        // Shift the parts in in the item_buffer and add the new one
-        l_ngramm_buffer[2] = (l_ngramm_buffer[1] << 1) | (l_ngramm_buffer[1] >> 31);
-        l_ngramm_buffer[1] = (l_ngramm_buffer[0] << 1) | (l_ngramm_buffer[0] >> 31);
-        l_ngramm_buffer[0] = item;
-        block_t tmp_ngramm_buffer = (l_ngramm_buffer[0] ^ l_ngramm_buffer[1]) ^ l_ngramm_buffer[2];
-
-        // add to sum buffer
-        if (feat_idx >= ngramm - 1) {
-            int j;
-            for (j = 0; j < sizeof(block_t) * 8; j++) {
-                l_ngramm_sum_buffer[j] += (tmp_ngramm_buffer >> j) & 1;
-            }
-        }
-    }
-
-    // copy values back to ngramm_sum_buffer
-    // TODO reorder sum buffer such that we can just use memcopy
     for (s_i = 0; s_i < sizeof(uint32_t) * 8; s_i++) {
         ngramm_sum_buffer[s_i * n_blk + blk] = l_ngramm_sum_buffer[s_i];
     }
@@ -201,26 +134,34 @@ extern "C" void hd_encoder_encode (
     // call the kernel
     int num_blocks = (n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
 
-    if (ngramm == 3) {
-        hd_encoder_3gramm_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK>>>(
-            n_blk,
-            state->device.ngramm_sum_buffer,
-            state->device.item_lookup,
-            n_items,
-            d_x,
-            n_x
-        );
-    } else {
-        hd_encoder_kernel<<<num_blocks, NUM_THREADS_IN_BLOCK>>>(
-            n_blk,
-            ngramm,
-            state->device.ngramm_sum_buffer,
-            state->device.item_lookup,
-            n_items,
-            d_x,
-            n_x
-        );
+    uint32_t * d_sum_buffer = state->device.ngramm_sum_buffer;
+    block_t * d_item_lookup = state->device.item_lookup;
+    switch(ngramm) {
+        case 2:
+            hd_encoder_kernel<2><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        case 3:
+            hd_encoder_kernel<3><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        case 4:
+            hd_encoder_kernel<4><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        case 5:
+            hd_encoder_kernel<5><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        case 6:
+            hd_encoder_kernel<6><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        case 7:
+            hd_encoder_kernel<7><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        case 8:
+            hd_encoder_kernel<8><<<num_blocks, NUM_THREADS_IN_BLOCK>>>(n_blk, d_sum_buffer, d_item_lookup, n_items, d_x, n_x);
+            break;
+        default:
+            printf("Error! ngramm must be between 2 and 8, but it was %d\n", ngramm);
     }
+
     cudaDeviceSynchronize();
 
     // copy the output (ngramm_sum_buffer) back from the device
