@@ -13,6 +13,8 @@ extern "C" {
 // * Copy one part of x to device, then compute it and copy the next part at the same time.
 //   Use different streams for each part of the input, and use cudaMemcopyAsync.
 // * make clip also on the gpu, using the data from before, and don't copy the ngramm_sum_buffer over.
+
+// encode the whole input with a chunk of the HD vector (a single)
 template<int NGRAMM>
 __global__ void hd_encoder_kernel(
     const int n_blk,
@@ -24,63 +26,62 @@ __global__ void hd_encoder_kernel(
 )
 {
     // compute the index of the block on which we must work
-    int blk = blockIdx.x * blockDim.x + threadIdx.x;
+    int blk_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // exit if blk is outside of the range
-    if (blk >= n_blk) {
+    // exit if blk_idx is outside of the range
+    if (blk_idx >= n_blk) {
         return;
     }
 
-    // prepare local memory
-    block_t l_ngramm_buffer[NGRAMM];
-    uint32_t l_ngramm_sum_buffer[sizeof(uint32_t) * 8];
+    int i; // iterator
+
+    // local copies of the:
+    // - HD feature vector chunk n-gramm buffer
+    block_t l_item_buffer[NGRAMM];
+    memset(l_item_buffer, 0, sizeof(l_item_buffer));
+
+    // - encoded n-gramm summation chunk buffer
+    uint32_t l_ngramm_sum_buffer[sizeof(block_t) * 8];
+    memset(l_ngramm_sum_buffer, 0, sizeof(l_ngramm_sum_buffer));
+
+    // - HD vector chunk lookup array
     block_t l_item_lookup[MAX_NUM_ITEMS];
-
-    // reset ngramm_sum_buffer
-    memset(l_ngramm_sum_buffer, 0, sizeof(l_ngramm_sum_buffer[0]) * 8 * sizeof(uint32_t));
-    memset(l_ngramm_buffer, 0, sizeof(l_ngramm_buffer[0]) * NGRAMM);
-
-    // load item_lookup
-    uint32_t s_i; // iterator
-    for (s_i = 0; s_i < n_items; s_i++) {
-        l_item_lookup[s_i] = item_lookup[s_i * n_blk + blk];
+    for (i = 0; i < n_items; i++) {
+        l_item_lookup[i] = item_lookup[i * n_blk + blk_idx];
     }
 
     // loop over every single feature
     int feat_idx;
     for (feat_idx = 0; feat_idx < n_x; feat_idx++) {
-        // get position of the item in the lookup table
-        feature_t item_lookup_idx = x[feat_idx];
-        // get the part of the item
-        block_t item = l_item_lookup[item_lookup_idx];
-
-        // Shift the parts in in the item_buffer and add the new one
+        // barrel shift each HD feature vector chunk as it gets a feature increment older
         int i;
         for (i = NGRAMM - 1; i >= 1; i--) {
-            block_t previous = l_ngramm_buffer[i-1];
-            l_ngramm_buffer[i] = (previous << 1) | (previous >> 31);
+            block_t previous = l_item_buffer[i-1];
+            l_item_buffer[i] = (previous << 1) | (previous >> 31);
         }
-        // set the new value
-        l_ngramm_buffer[0] = item;
 
-        // compute the encoded ngramm
+        // populate new HD feature vector chunk
+        feature_t item_lookup_idx = x[feat_idx];
+        block_t item = l_item_lookup[item_lookup_idx];
+        l_item_buffer[0] = item;
+
+        // compute the encoded n-gramm
         block_t tmp_ngramm_buffer = item;
         for (i = 1; i < NGRAMM; i++) {
-            tmp_ngramm_buffer ^= l_ngramm_buffer[i];
+            tmp_ngramm_buffer ^= l_item_buffer[i];
         }
 
-        // add to sum buffer
+        // unpack and accumulate the encoded n-gramm
         if (feat_idx >= NGRAMM - 1) {
-            int j;
-            for (j = 0; j < sizeof(block_t) * 8; j++) {
-                l_ngramm_sum_buffer[j] += (tmp_ngramm_buffer >> j) & 1;
+            for (i = 0; i < sizeof(block_t) * 8; i++) {
+                l_ngramm_sum_buffer[i] += (tmp_ngramm_buffer >> i) & 1;
             }
         }
     }
 
     // copy values back to ngramm_sum_buffer
-    for (s_i = 0; s_i < sizeof(uint32_t) * 8; s_i++) {
-        ngramm_sum_buffer[s_i * n_blk + blk] = l_ngramm_sum_buffer[s_i];
+    for (i = 0; i < sizeof(block_t) * 8; i++) {
+        ngramm_sum_buffer[i * n_blk + blk_idx] = l_ngramm_sum_buffer[i];
     }
 }
 
@@ -114,7 +115,7 @@ extern "C" void hd_encoder_call_kernel(
         CALL_KERNEL_CASE(6)
         CALL_KERNEL_CASE(7)
         CALL_KERNEL_CASE(8)
-        
+
         default:
             printf("Error! ngramm must be between 2 and 8, but it was %d\n", state->ngramm);
     }
@@ -199,12 +200,12 @@ void clip(
     // we ignore the randomization here...
 
     int n_blk = n_in / 32;
-    int blk;
-    for (blk = 0; blk < n_blk; blk++) {
-        int s_i;
-        for (s_i = 0; s_i < 32; s_i++) {
-            out[blk] <<= 1;
-            out[blk] += ((uint32_t)(threshold - in[s_i * n_blk + blk])) >> 31;
+    int blk_idx;
+    for (blk_idx = 0; blk_idx < n_blk; blk_idx++) {
+        int i;
+        for (i = 0; i < 32; i++) {
+            out[blk_idx] <<= 1;
+            out[blk_idx] += ((uint32_t)(threshold - in[i * n_blk + blk_idx])) >> 31;
         }
     }
 
