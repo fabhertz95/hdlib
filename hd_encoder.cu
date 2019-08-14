@@ -97,62 +97,24 @@ extern "C" void hd_encoder_call_kernel(
     int num_blocks = (state->n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
 
     switch(state->ngramm) {
-        case 2:
-            hd_encoder_kernel<2><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
+#define CALL_KERNEL_CASE(N) \
+        case N: \
+            hd_encoder_kernel<N><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>( \
+                state->n_blk, \
+                state->device.ngramm_sum_buffer, \
+                state->device.item_lookup, \
+                state->n_items, \
+                d_x, n_x); \
             break;
-        case 3:
-            hd_encoder_kernel<3><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
-            break;
-        case 4:
-            hd_encoder_kernel<4><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
-            break;
-        case 5:
-            hd_encoder_kernel<5><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
-            break;
-        case 6:
-            hd_encoder_kernel<6><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
-            break;
-        case 7:
-            hd_encoder_kernel<7><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
-            break;
-        case 8:
-            hd_encoder_kernel<8><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>(
-                state->n_blk,
-                state->device.ngramm_sum_buffer,
-                state->device.item_lookup,
-                state->n_items,
-                d_x, n_x);
-            break;
+
+        CALL_KERNEL_CASE(2)
+        CALL_KERNEL_CASE(3)
+        CALL_KERNEL_CASE(4)
+        CALL_KERNEL_CASE(5)
+        CALL_KERNEL_CASE(6)
+        CALL_KERNEL_CASE(7)
+        CALL_KERNEL_CASE(8)
+        
         default:
             printf("Error! ngramm must be between 2 and 8, but it was %d\n", state->ngramm);
     }
