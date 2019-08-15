@@ -149,13 +149,17 @@ class load_data:
         return char_array.reshape(1, -1), np.array(label).reshape(1)
 
     def store_sample(self, filename, X, y):
+        format_version = 1
+
         import struct
         assert X.shape[0] == 1
         with open(filename, "wb") as _f:
+            # write version
+            _f.write(struct.pack("<I", format_version))
             # wirte label
-            _f.write(struct.pack("B", y.item()))
+            _f.write(struct.pack("<I", y.item()))
             # write shape
-            _f.write(struct.pack("<i", X.shape[1]))
+            _f.write(struct.pack("<I", X.shape[1]))
             # write data
             for feature in X[0]:
                 _f.write(struct.pack("B", feature.item()))

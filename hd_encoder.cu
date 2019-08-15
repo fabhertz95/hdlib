@@ -14,7 +14,7 @@ extern "C" {
 //   Use different streams for each part of the input, and use cudaMemcopyAsync.
 // * make clip also on the gpu, using the data from before, and don't copy the ngramm_sum_buffer over.
 
-// encode the whole input with a chunk of the HD vector (a single)
+// encode the whole input with a chunk of the HD vector (a single block_t)
 template<int NGRAMM>
 __global__ void hd_encoder_kernel(
     const int n_blk,

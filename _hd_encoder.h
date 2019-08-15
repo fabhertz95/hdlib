@@ -7,6 +7,8 @@ typedef uint8_t feature_t;
 // packed HD vector block
 typedef uint32_t block_t;
 
+// TODO: typedef uint32_t accumulator_t for ngramm encoding
+
 // struct to store pointers on the device, which remain
 struct device_data_t
 {
