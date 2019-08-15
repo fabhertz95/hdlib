@@ -7,6 +7,12 @@ extern "C" {
 #include "hd_encoder.h"
 }
 
+// number of threads per block in the grid
+#define NUM_THREADS_IN_BLOCK 128
+#define NUM_INPUT_CHUNKS 2
+
+#define NUM_HD_BLOCKS_IN_BLOCK (NUM_THREADS_IN_BLOCK / NUM_INPUT_CHUNKS)
+
 #define MAX_NUM_ITEMS 32
 
 // TODO: Stuff to optimize
@@ -27,10 +33,29 @@ __global__ void hd_encoder_kernel(
 {
     // compute the index of the block on which we must work
     int blk_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int x_chunk_idx = blockIdx.y * blockDim.y + threadIdx.y;
 
     // exit if blk_idx is outside of the range
-    if (blk_idx >= n_blk) {
+    if (blk_idx >= n_blk || x_chunk_idx >= NUM_INPUT_CHUNKS) {
         return;
+    }
+
+    // there are (NUM_INPUT_CHUNKS - 1) overlaps of (NGRAMM - 1),
+    // but the number of XOR calculations only depends on
+    // the number of outputs to the accummulation buffer
+
+    // example: n_x = 9, ngramm = 3, NUM_INPUT_CHUNKS = 2
+    //          xored_n_x := 7, x_chunk_len = 4 (3 for last chunk)
+    //
+    // o - load only, x - load and xor
+    // chunk 0: ooxxxx---
+    // chunk 1: ----ooxxx
+    //            <--> chunk 0 length (pre-loaded data not included)
+    const int xored_n_x = n_x - (NGRAMM - 1);
+    int x_chunk_len = (xored_n_x + NUM_INPUT_CHUNKS - 1) / NUM_INPUT_CHUNKS;
+    const int x_chunk_start = x_chunk_idx * x_chunk_len;
+    if (x_chunk_start + x_chunk_len > n_x) {
+        x_chunk_len = n_x - x_chunk_start;
     }
 
     int i; // iterator
@@ -51,8 +76,8 @@ __global__ void hd_encoder_kernel(
     }
 
     // loop over every single feature
-    int feat_idx;
-    for (feat_idx = 0; feat_idx < n_x; feat_idx++) {
+    int x_chunk_iter;
+    for (x_chunk_iter = 0; x_chunk_iter < NGRAMM - 1 + x_chunk_len; x_chunk_iter++) {
         // barrel shift each HD feature vector chunk as it gets a feature increment older
         int i;
         for (i = NGRAMM - 1; i >= 1; i--) {
@@ -61,18 +86,19 @@ __global__ void hd_encoder_kernel(
         }
 
         // populate new HD feature vector chunk
-        feature_t item_lookup_idx = x[feat_idx];
+        feature_t item_lookup_idx = x[x_chunk_start + x_chunk_iter];
         block_t item = l_item_lookup[item_lookup_idx];
         l_item_buffer[0] = item;
 
-        // compute the encoded n-gramm
-        block_t tmp_ngramm_buffer = item;
-        for (i = 1; i < NGRAMM; i++) {
-            tmp_ngramm_buffer ^= l_item_buffer[i];
-        }
-
-        // unpack and accumulate the encoded n-gramm
-        if (feat_idx >= NGRAMM - 1) {
+        // only pre-load the first (NGRAMM - 1) items
+        if (x_chunk_iter >= NGRAMM - 1) {
+            // compute the encoded n-gramm
+            block_t tmp_ngramm_buffer = item;
+            for (i = 1; i < NGRAMM; i++) {
+                tmp_ngramm_buffer ^= l_item_buffer[i];
+            }
+    
+            // unpack and accumulate the encoded n-gramm
             for (i = 0; i < sizeof(block_t) * 8; i++) {
                 l_ngramm_sum_buffer[i] += (tmp_ngramm_buffer >> i) & 1;
             }
@@ -80,8 +106,9 @@ __global__ void hd_encoder_kernel(
     }
 
     // copy values back to ngramm_sum_buffer
+    // TODO this is a memory race and should be reduced instead
     for (i = 0; i < sizeof(block_t) * 8; i++) {
-        ngramm_sum_buffer[i * n_blk + blk_idx] = l_ngramm_sum_buffer[i];
+        ngramm_sum_buffer[i * n_blk + blk_idx] += l_ngramm_sum_buffer[i];
     }
 }
 
@@ -94,13 +121,20 @@ extern "C" void hd_encoder_call_kernel(
     cudaStream_t stream = NULL
 )
 {
+    // Each grid block calculates a chunk of the HD vector
+    // for the entire input. Withing the block, threads divide work
+    // both along the HD vector and the input.
+    dim3 threads(NUM_THREADS_IN_BLOCK / NUM_INPUT_CHUNKS, NUM_INPUT_CHUNKS);
+
     // compute the number of blocks used
-    int num_blocks = (state->n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
+    int num_blocks = (state->n_blk + NUM_HD_BLOCKS_IN_BLOCK - 1) / NUM_HD_BLOCKS_IN_BLOCK;
+
+    dim3 grid(num_blocks);
 
     switch(state->ngramm) {
 #define CALL_KERNEL_CASE(N) \
         case N: \
-            hd_encoder_kernel<N><<<num_blocks, NUM_THREADS_IN_BLOCK, 0, stream>>>( \
+            hd_encoder_kernel<N><<<grid, threads, 0, stream>>>( \
                 state->n_blk, \
                 state->device.ngramm_sum_buffer, \
                 state->device.item_lookup, \
@@ -157,8 +191,13 @@ extern "C" void hd_encoder_encode (
 {
     const int n_blk = state->n_blk;
 
-    // reset the sum count
+    // reset the sum count and buffer
     state->ngramm_sum_count = 0;
+    cudaMemset(
+        state->device.ngramm_sum_buffer,
+        0,
+        n_blk * sizeof(block_t) * 8 * sizeof(uint32_t)
+    );
 
     // allocate input data memory on the device
     feature_t * d_x;
