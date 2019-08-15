@@ -105,10 +105,18 @@ __global__ void hd_encoder_kernel(
         }
     }
 
-    // copy values back to ngramm_sum_buffer
-    // TODO this is a memory race and should be reduced instead
-    for (i = 0; i < sizeof(block_t) * 8; i++) {
-        ngramm_sum_buffer[i * n_blk + blk_idx] += l_ngramm_sum_buffer[i];
+    // accumulating the results to the ngramm_sum_buffer creates a memory race condition
+    // avoid this by means of linear reduction across threads
+    // TODO implement a better reduction
+    int curr_x_chunk;
+    for (curr_x_chunk = 0; curr_x_chunk < NUM_INPUT_CHUNKS; curr_x_chunk++) {
+        __syncthreads();
+        if (curr_x_chunk == x_chunk_idx) {
+            // copy values back to ngramm_sum_buffer
+            for (i = 0; i < sizeof(block_t) * 8; i++) {
+                ngramm_sum_buffer[i * n_blk + blk_idx] += l_ngramm_sum_buffer[i];
+            }
+        }
     }
 }
 
