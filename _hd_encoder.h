@@ -14,7 +14,7 @@ struct device_data_t
 {
     // shape: [n_blk, ngramm]
     block_t * ngramm_buffer;
-    // shape: [n_blk * 32]
+    // shape: [n_blk, blk_size]
     uint32_t * ngramm_sum_buffer;
     // shape: [n_blk, n_items]
     block_t * item_lookup;
@@ -22,7 +22,8 @@ struct device_data_t
 
 struct hd_encoder_t
 {
-    // HD vector length
+    // packed HD vector length, with each element
+    // containing blk_size = sizeof(block_t) * 8 bits
     int n_blk;
 
     // n-gramm length
@@ -33,7 +34,7 @@ struct hd_encoder_t
     block_t * ngramm_buffer;
 
     // encoded n-gramm summation buffer
-    // shape: GPU: [n_blk, 32], CPU: [32 * n_blk]
+    // shape: GPU: [n_blk, blk_size], CPU: [blk_size * n_blk]
     uint32_t * ngramm_sum_buffer;
     int ngramm_sum_count;
 

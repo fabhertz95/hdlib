@@ -20,7 +20,7 @@ import numpy as np
 sys.path.append('../../pyhdlib/')
 
 from load_data import load_data
-from hd_classifier import hd_classifier_ext, bin2int
+from hd_classifier import hd_classifier_ext
 
 # data loader
 dl = load_data()

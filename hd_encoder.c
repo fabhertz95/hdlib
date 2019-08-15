@@ -161,9 +161,9 @@ void clip(
         {
             int in_with_rand = in[i] + (random_vector[i / 32] & 1);
             random_vector[i / 32] >>= 1;
-            out[i / 32] <<= 1;
+            out[i / (sizeof(block_t) * 8)] <<= 1;
             // set to 1 if above threshold and 0 otherwise
-            out[i / 32] += ((uint32_t)(threshold - in_with_rand)) >> 31;
+            out[i / (sizeof(block_t) * 8)] += ((uint32_t)(threshold - in_with_rand)) >> 31;
         }
     }
     else
@@ -171,8 +171,8 @@ void clip(
         int i;
         for (i = 0; i < n_in; i++)
         {
-            out[i / 32] <<= 1;
-            out[i / 32] += ((uint32_t)(threshold - in[i])) >> 31;
+            out[i / (sizeof(block_t) * 8)] <<= 1;
+            out[i / (sizeof(block_t) * 8)] += ((uint32_t)(threshold - in[i])) >> 31;
         }
     }
 

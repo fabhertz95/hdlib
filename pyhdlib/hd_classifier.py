@@ -22,6 +22,8 @@ __date__ = "17.5.2019"
 
 
 class hd_classifier_ext():
+    blk_size = 32
+
     def __init__(self):
 
         import cffi
@@ -66,15 +68,15 @@ class hd_classifier_ext():
 
         # prepare data for interaction
         # TODO this will likely be unnecesary in the future (see same lines in am_init)
-        self._ngramm_sum_buffer = t.Tensor(self._encoder.n_blk * 32).type(t.int32).contiguous()
+        self._ngramm_sum_buffer = t.Tensor(self._encoder.n_blk * self.blk_size).type(t.int32).contiguous()
         self._encoder.ngramm_sum_buffer = self._ffi.cast('uint32_t * const', self._ngramm_sum_buffer.data_ptr())
 
     def am_init(self, D, nitem, n_classes, ngramm=3):
-        # round D up to the nearest multiple of 32
-        n_blk = int((D + 31) / 32)
-        if D != n_blk * 32:
-            print(f"Dimensionality given which is not a multiple of 32! Using {n_blk * 32} instead")
-        D = n_blk * 32
+        # round D up to the nearest multiple of blk_size
+        n_blk = int((D + self.blk_size - 1) / self.blk_size)
+        if D != n_blk * self.blk_size:
+            print(f"Dimensionality given which is not a multiple of {blk_size}! Using {n_blk * self.blk_size} instead")
+        D = n_blk * self.blk_size
 
         self._D = D
 
@@ -95,7 +97,7 @@ class hd_classifier_ext():
 
         self._classifier = self._ffi.new('struct hd_classifier_t *')
         self._lib.hd_classifier_init(self._classifier, self._encoder.n_blk, n_classes, 0)
-        self._classifier.class_vec_sum = self._ffi.cast('block_t *', self._class_vec_sum.data_ptr())
+        self._classifier.class_vec_sum = self._ffi.cast('uint32_t *', self._class_vec_sum.data_ptr())
         self._classifier.class_vec_cnt = self._ffi.cast('int *', self._class_vec_cnt.data_ptr())
 
         # TODO: release memory and close self._lib

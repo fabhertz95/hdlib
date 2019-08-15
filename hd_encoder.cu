@@ -199,11 +199,11 @@ void clip(
 
     // we ignore the randomization here...
 
-    int n_blk = n_in / 32;
+    int n_blk = n_in / (sizeof(block_t) * 8);
     int blk_idx;
     for (blk_idx = 0; blk_idx < n_blk; blk_idx++) {
         int i;
-        for (i = 0; i < 32; i++) {
+        for (i = 0; i < (sizeof(block_t) * 8); i++) {
             out[blk_idx] <<= 1;
             out[blk_idx] += ((uint32_t)(threshold - in[i * n_blk + blk_idx])) >> 31;
         }
