@@ -12,7 +12,6 @@ __email__ = "herschmi@ethz.ch"
 __date__ = "20.5.2019"
 
 import argparse
-import os
 import sys
 import time
 import numpy as np
@@ -20,7 +19,7 @@ import numpy as np
 sys.path.append('../../pyhdlib/')
 
 from load_data import load_data
-from hd_classifier import hd_classifier_ext
+from hd_classifier import hd_classifier_ext, bin2int
 
 # data loader
 dl = load_data()
@@ -33,7 +32,7 @@ D = 10000
 device = 'cuda:0'
 
 
-name = os.path.join('data', 'models', str(ngramm) + 'gramm')
+name = 'data/models/' + str(ngramm) + 'gramm'
 
 
 #hd = hd_classifier(D, encoding, device, nitem, ngramm, name=name)
@@ -94,7 +93,7 @@ def plot_language_class(training, testing, store):
 
     if store:
         # store test data as binary files
-        dl.store_test_data(os.path.join('data', 'binary_test_data'))
+        dl.store_test_data('data/binary_test_data')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='natural language classifier')

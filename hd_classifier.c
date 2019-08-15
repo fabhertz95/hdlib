@@ -1,4 +1,3 @@
-#include <endian.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -199,33 +198,19 @@ int hamming_distance(
     return result;
 }
 
-// file format version to verify against
-const int format_version = 1;
-
 void save(
     const struct hd_classifier_t * const s_classif,
     const struct hd_encoder_t * const s_enc,
     const char * const filename
 )
 {
-    uint32_t tmp;
-
     FILE * fp = fopen(filename, "wb");
 
-    tmp = htole32(format_version);
-    fwrite(&tmp, sizeof(tmp), 1, fp);
-
-    tmp = htole32(s_classif->n_blk * sizeof(block_t) * 8);
-    fwrite(&tmp, sizeof(tmp), 1, fp);
-
-    tmp = htole32(s_classif->n_class);
-    fwrite(&tmp, sizeof(tmp), 1, fp);
-
-    tmp = htole32(s_enc->ngramm);
-    fwrite(&tmp, sizeof(tmp), 1, fp);
-
-    tmp = htole32(s_enc->n_items);
-    fwrite(&tmp, sizeof(tmp), 1, fp);
+    // write dimensionality
+    fwrite(&(s_classif->n_blk), sizeof(s_classif->n_blk), 1, fp);
+    fwrite(&(s_classif->n_class), sizeof(s_classif->n_class), 1, fp);
+    fwrite(&(s_enc->ngramm), sizeof(s_enc->ngramm), 1, fp);
+    fwrite(&(s_enc->n_items), sizeof(s_enc->n_items), 1, fp);
 
     // write trained language vectors
     fwrite(s_classif->class_vec, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
@@ -242,49 +227,24 @@ int load(
     const char * filename
 )
 {
-    uint32_t tmp;
-
-    // try to load the file
-    FILE * fp = fopen(filename, "rb");
-    if (fp == NULL) return -1;
-
     // to keep track of how many bytes were read, for checking if everything was ok
     int bytes_read = 0;
 
-    // check file version
-    bytes_read += sizeof(tmp) * fread(&tmp, sizeof(tmp), 1, fp);
-    int received_format_version = le32toh(tmp);
-    if (received_format_version != format_version) {
-        printf("failed to read file: %s! expected version %d, got %d\n",
-            filename,
-            format_version,
-            received_format_version
-        );
-        fclose(fp);
-        return -1;
-    }
-    // read dimensionality, class and other parameters from the file
-    bytes_read += sizeof(tmp) * fread(&tmp, sizeof(tmp), 1, fp);
-    int D = le32toh(tmp);
-    if (D % (sizeof(block_t) * 8) != 0) {
-        printf("dimensionality D=%d is not a multiple of %zd\n", D, sizeof(block_t) * 8);
-        fclose(fp);
-        return -1;
-    }
-    s_classif->n_blk = D / (sizeof(block_t) * 8);
-    s_enc->n_blk = s_classif->n_blk;
+    // try to open file
+    FILE * fp = fopen(filename, "rb");
 
-    bytes_read += sizeof(tmp) * fread(&tmp, sizeof(tmp), 1, fp);
-    s_classif->n_class = le32toh(tmp);
-    
-    bytes_read += sizeof(tmp) * fread(&tmp, sizeof(tmp), 1, fp);
-    s_enc->ngramm = le32toh(tmp);
+    // exit if fp is null
+    if (fp == NULL) return -1;
 
-    bytes_read += sizeof(tmp) * fread(&tmp, sizeof(tmp), 1, fp);
-    s_enc->n_items = le32toh(tmp);
+    // first, read dimensionality from the file
+    bytes_read += fread(&(s_classif->n_blk), sizeof(s_classif->n_blk), 1, fp);
+    bytes_read += fread(&(s_classif->n_class), sizeof(s_classif->n_class), 1, fp);
+    bytes_read += fread(&(s_enc->ngramm), sizeof(s_enc->ngramm), 1, fp);
+    bytes_read += fread(&(s_enc->n_items), sizeof(s_enc->n_items), 1, fp);
+    s_enc->n_blk = s_classif->n_blk; // also apply n_blk to encoder
 
-    printf("reading model: D=%d, n_class=%d, ngramm=%d, n_items=%d\n",
-           D,
+    printf("Reading model: D=%d, n_class=%d, ngramm=%d, n_items=%d\n",
+           s_enc->n_blk * 32,
            s_classif->n_class,
            s_enc->ngramm,
            s_enc->n_items);
@@ -295,19 +255,16 @@ int load(
     // TODO This line above also initializes the item lookup!
 
     // read the trained language vectors
-    bytes_read += sizeof(block_t) * fread(s_classif->class_vec, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
+    bytes_read += fread(s_classif->class_vec, sizeof(block_t), s_classif->n_blk * s_classif->n_class, fp);
 
     // read item_lookup
-    bytes_read += sizeof(block_t) * fread(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
+    bytes_read += fread(s_enc->item_lookup, sizeof(block_t), s_enc->n_items * s_enc->n_blk, fp);
 
     // close the file
     fclose(fp);
 
     // check if the right amount of bytes were read
-    if (bytes_read ==
-        5 * sizeof(uint32_t) +
-        s_classif->n_blk * s_classif->n_class * sizeof(block_t) +
-        s_enc->n_items * s_enc->n_blk * sizeof(block_t))
+    if (bytes_read == 4 + s_classif->n_blk * s_classif->n_class + s_enc->n_items * s_enc->n_blk)
     {
         return 0;
     }

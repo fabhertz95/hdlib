@@ -27,45 +27,25 @@ char current_filename[TEST_FOLDER_LEN + TEST_SAMPLE_NAME_LEN + 11];
 
 feature_t * load_binary_sample(char * filename, int * n_x, class_t * y)
 {
-    // file format version to verify against
-    const int format_version = 1;
-
-    uint32_t tmp;
-
     // try to load the file
     FILE * fp = fopen(filename, "rb");
     if (fp == NULL) return NULL;
 
     int bytes_read = 0;
 
-    // check file version
-    bytes_read += sizeof(tmp) * fread(&tmp, 4, 1, fp);
-    int received_format_version = le32toh(tmp);
-    if (received_format_version != format_version) {
-        printf("Failed to read file: %s! Expected version %d, got %d\n",
-            filename,
-            format_version,
-            received_format_version
-        );
-        fclose(fp);
-        return NULL;
-    }
     // read class idx and size
-    bytes_read += sizeof(tmp) * fread(&tmp, 4, 1, fp);
-    *y = le32toh(tmp);
-    bytes_read += sizeof(tmp) * fread(&tmp, 4, 1, fp);
-    *n_x = le32toh(tmp);
+    bytes_read += fread(y, sizeof(class_t), 1, fp);
+    bytes_read += fread(n_x, sizeof(int), 1, fp);
 
     // allocate memory of given size
     feature_t * x = malloc(sizeof(feature_t) * (*n_x));
 
     // read X data
-    bytes_read += sizeof(tmp) * fread(&tmp, 4, 1, fp);
-    bytes_read += sizeof(feature_t) * fread(x, sizeof(feature_t), (*n_x), fp);
+    bytes_read += fread(x, sizeof(feature_t), (*n_x), fp);
 
     // check if the correct number of bytes were read
-    if (bytes_read != 3 * sizeof(uint32_t) + sizeof(feature_t) * (*n_x)) {
-        printf("Failed to read file: %s!\n", filename);
+    if (bytes_read != 2 + *n_x) {
+        printf("Failed to read file: %s!\n", current_filename);
         fclose(fp);
         return NULL;
     }
