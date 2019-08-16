@@ -21,6 +21,7 @@ extern "C" void hd_encoder_call_kernel(
     struct hd_encoder_t * const state,
     const feature_t * d_x,
     const int n_x,
+    int use_input_chunks = 1,
     cudaStream_t stream = NULL
 );
 
@@ -123,7 +124,7 @@ void hd_batch_encoder_encode (
         cudaMemcpyAsync(d_x[i], x[i], n_x[i] * sizeof(feature_t), cudaMemcpyHostToDevice, streams[i]);
 
         // call the kernel
-        hd_encoder_call_kernel(&(states[i]), d_x[i], n_x[i], streams[i]);
+        hd_encoder_call_kernel(&(states[i]), d_x[i], n_x[i], 0, streams[i]);
 
         // copy the output (ngramm_sum_buffer) back from the device
         cudaMemcpyAsync(

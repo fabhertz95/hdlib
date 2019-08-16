@@ -9,9 +9,9 @@ extern "C" {
 
 // number of threads per block in the grid
 #define NUM_THREADS_IN_BLOCK 128
-#define NUM_INPUT_CHUNKS 2
+#define MAX_NUM_INPUT_CHUNKS 2
 
-#define NUM_HD_BLOCKS_IN_BLOCK (NUM_THREADS_IN_BLOCK / NUM_INPUT_CHUNKS)
+#define NUM_HD_BLOCKS_IN_BLOCK (NUM_THREADS_IN_BLOCK / MAX_NUM_INPUT_CHUNKS)
 
 #define MAX_NUM_ITEMS 32
 
@@ -21,7 +21,7 @@ extern "C" {
 // * make clip also on the gpu, using the data from before, and don't copy the ngramm_sum_buffer over.
 
 // encode the whole input with a chunk of the HD vector (a single)
-template<int NGRAMM>
+template<int NGRAMM, int NUM_INPUT_CHUNKS>
 __global__ void hd_encoder_kernel(
     const int n_blk,
     uint32_t * __restrict__ ngramm_sum_buffer,
@@ -108,14 +108,20 @@ __global__ void hd_encoder_kernel(
     // accumulating the results to the ngramm_sum_buffer creates a memory race condition
     // avoid this by means of linear reduction across threads
     // TODO implement a better reduction
-    int curr_x_chunk;
-    for (curr_x_chunk = 0; curr_x_chunk < NUM_INPUT_CHUNKS; curr_x_chunk++) {
-        __syncthreads();
-        if (curr_x_chunk == x_chunk_idx) {
-            // copy values back to ngramm_sum_buffer
-            for (i = 0; i < sizeof(block_t) * 8; i++) {
-                ngramm_sum_buffer[i * n_blk + blk_idx] += l_ngramm_sum_buffer[i];
+    if (NUM_INPUT_CHUNKS > 1) {
+        int curr_x_chunk;
+        for (curr_x_chunk = 0; curr_x_chunk < NUM_INPUT_CHUNKS; curr_x_chunk++) {
+            __syncthreads();
+            if (curr_x_chunk == x_chunk_idx) {
+                // copy values back to ngramm_sum_buffer
+                for (i = 0; i < sizeof(block_t) * 8; i++) {
+                    ngramm_sum_buffer[i * n_blk + blk_idx] += l_ngramm_sum_buffer[i];
+                }
             }
+        }
+    } else {
+        for (i = 0; i < sizeof(block_t) * 8; i++) {
+            ngramm_sum_buffer[i * n_blk + blk_idx] = l_ngramm_sum_buffer[i];
         }
     }
 }
@@ -126,28 +132,43 @@ extern "C" void hd_encoder_call_kernel(
     struct hd_encoder_t * const state,
     const feature_t * d_x,
     const int n_x,
+    int use_input_chunks = 1,
     cudaStream_t stream = NULL
 )
 {
-    // Each grid block calculates a chunk of the HD vector
-    // for the entire input. Withing the block, threads divide work
-    // both along the HD vector and the input.
-    dim3 threads(NUM_THREADS_IN_BLOCK / NUM_INPUT_CHUNKS, NUM_INPUT_CHUNKS);
+    dim3 threads, grid;
+    if (use_input_chunks) {
+        // Each grid block calculates a chunk of the HD vector
+        // for the entire input. Withing the block, threads divide work
+        // both along the HD vector and the input.
+        threads.x = NUM_HD_BLOCKS_IN_BLOCK;
+        threads.y = MAX_NUM_INPUT_CHUNKS;
 
-    // compute the number of blocks used
-    int num_blocks = (state->n_blk + NUM_HD_BLOCKS_IN_BLOCK - 1) / NUM_HD_BLOCKS_IN_BLOCK;
-
-    dim3 grid(num_blocks);
+        // compute the number of blocks used
+        grid.x = (state->n_blk + NUM_HD_BLOCKS_IN_BLOCK - 1) / NUM_HD_BLOCKS_IN_BLOCK;
+    } else {
+        threads.x = NUM_THREADS_IN_BLOCK;
+        grid.x = (state->n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
+    }
 
     switch(state->ngramm) {
 #define CALL_KERNEL_CASE(N) \
         case N: \
-            hd_encoder_kernel<N><<<grid, threads, 0, stream>>>( \
-                state->n_blk, \
-                state->device.ngramm_sum_buffer, \
-                state->device.item_lookup, \
-                state->n_items, \
-                d_x, n_x); \
+            if (use_input_chunks) { \
+                hd_encoder_kernel<N, MAX_NUM_INPUT_CHUNKS><<<grid, threads, 0, stream>>>(    \
+                    state->n_blk, \
+                    state->device.ngramm_sum_buffer, \
+                    state->device.item_lookup, \
+                    state->n_items, \
+                    d_x, n_x); \
+            } else { \
+                hd_encoder_kernel<N, 1><<<grid, threads, 0, stream>>>(    \
+                    state->n_blk, \
+                    state->device.ngramm_sum_buffer, \
+                    state->device.item_lookup, \
+                    state->n_items, \
+                    d_x, n_x); \
+            } \
             break;
 
         CALL_KERNEL_CASE(2)
