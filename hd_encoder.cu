@@ -9,7 +9,7 @@ extern "C" {
 
 // number of threads per block in the grid
 #define NUM_THREADS_IN_BLOCK 128
-#define MAX_NUM_INPUT_CHUNKS 2
+#define MAX_NUM_INPUT_CHUNKS 4
 
 #define NUM_HD_BLOCKS_IN_BLOCK (NUM_THREADS_IN_BLOCK / MAX_NUM_INPUT_CHUNKS)
 
@@ -31,6 +31,9 @@ __global__ void hd_encoder_kernel(
     const int n_x
 )
 {
+    // setup shared memory
+    extern __shared__ uint32_t s[];
+
     // compute the index of the block on which we must work
     int blk_idx = blockIdx.x * blockDim.x + threadIdx.x;
     int x_chunk_idx = blockIdx.y * blockDim.y + threadIdx.y;
@@ -70,9 +73,21 @@ __global__ void hd_encoder_kernel(
     memset(l_ngramm_sum_buffer, 0, sizeof(l_ngramm_sum_buffer));
 
     // - HD vector chunk lookup array
-    block_t l_item_lookup[MAX_NUM_ITEMS];
-    for (i = 0; i < n_items; i++) {
-        l_item_lookup[i] = item_lookup[i * n_blk + blk_idx];
+    // To load the lookup array, we should use every thread for fetching the data.
+    // Split n_items into chunks, to load the lookup of a single block in parallel.
+    int num_items_to_load = (n_items + NUM_INPUT_CHUNKS - 1) / NUM_INPUT_CHUNKS;
+    int start_item_to_load = x_chunk_idx * num_items_to_load;
+    if (start_item_to_load + num_items_to_load > n_items) {
+        num_items_to_load = n_items - start_item_to_load;
+    }
+    block_t *  s_item_lookup = s;
+    for (i = start_item_to_load; i < start_item_to_load + num_items_to_load; i++) {
+        s_item_lookup[i * blockDim.x + threadIdx.x] = item_lookup[i * n_blk + blk_idx];
+    }
+
+    // sync threads if NUM_INPUT_CHUNKS is bigger than 1 (else, we do not have any dependeny)
+    if (NUM_INPUT_CHUNKS > 1) {
+        __syncthreads();
     }
 
     // loop over every single feature
@@ -87,7 +102,7 @@ __global__ void hd_encoder_kernel(
 
         // populate new HD feature vector chunk
         feature_t item_lookup_idx = x[x_chunk_start + x_chunk_iter];
-        block_t item = l_item_lookup[item_lookup_idx];
+        block_t item = s_item_lookup[item_lookup_idx * blockDim.x + threadIdx.x];
         l_item_buffer[0] = item;
 
         // only pre-load the first (NGRAMM - 1) items
@@ -137,6 +152,7 @@ extern "C" void hd_encoder_call_kernel(
 )
 {
     dim3 threads, grid;
+    int smem_size;
     if (use_input_chunks) {
         // Each grid block calculates a chunk of the HD vector
         // for the entire input. Withing the block, threads divide work
@@ -146,23 +162,27 @@ extern "C" void hd_encoder_call_kernel(
 
         // compute the number of blocks used
         grid.x = (state->n_blk + NUM_HD_BLOCKS_IN_BLOCK - 1) / NUM_HD_BLOCKS_IN_BLOCK;
+
+        // compute shared memory size (for item lookup only)
+        smem_size = state->n_items * NUM_HD_BLOCKS_IN_BLOCK * sizeof(block_t);
     } else {
         threads.x = NUM_THREADS_IN_BLOCK;
         grid.x = (state->n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
+        smem_size = state->n_items * NUM_THREADS_IN_BLOCK * sizeof(block_t);
     }
 
     switch(state->ngramm) {
 #define CALL_KERNEL_CASE(N) \
         case N: \
             if (use_input_chunks) { \
-                hd_encoder_kernel<N, MAX_NUM_INPUT_CHUNKS><<<grid, threads, 0, stream>>>(    \
+                hd_encoder_kernel<N, MAX_NUM_INPUT_CHUNKS><<<grid, threads, smem_size, stream>>>(    \
                     state->n_blk, \
                     state->device.ngramm_sum_buffer, \
                     state->device.item_lookup, \
                     state->n_items, \
                     d_x, n_x); \
             } else { \
-                hd_encoder_kernel<N, 1><<<grid, threads, 0, stream>>>(    \
+                hd_encoder_kernel<N, 1><<<grid, threads, smem_size, stream>>>(    \
                     state->n_blk, \
                     state->device.ngramm_sum_buffer, \
                     state->device.item_lookup, \
