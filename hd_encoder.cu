@@ -122,16 +122,40 @@ __global__ void hd_encoder_kernel(
 
     // accumulating the results to the ngramm_sum_buffer creates a memory race condition
     // avoid this by means of linear reduction across threads
+    // reduction can use shared memory
     // TODO implement a better reduction
     if (NUM_INPUT_CHUNKS > 1) {
-        int curr_x_chunk;
-        for (curr_x_chunk = 0; curr_x_chunk < NUM_INPUT_CHUNKS; curr_x_chunk++) {
+        // make sure that all threads are done
+        __syncthreads();
+        // reuse shared memory for the reduction
+        uint32_t * s_ngramm_sum_buffer = s;
+
+        int curr_x_chunk = 0;
+        // make the first chunk (overwrite values)
+        if (curr_x_chunk == x_chunk_idx) {
+            for (i = 0; i < sizeof(block_t) * 8; i++) {
+                s_ngramm_sum_buffer[i * blockDim.x + threadIdx.x] = l_ngramm_sum_buffer[i];
+            }
+        }
+
+        // copy all remaining chunks except the last one
+        for (curr_x_chunk = 1; curr_x_chunk < (NUM_INPUT_CHUNKS - 1); curr_x_chunk++) {
             __syncthreads();
             if (curr_x_chunk == x_chunk_idx) {
                 // copy values back to ngramm_sum_buffer
                 for (i = 0; i < sizeof(block_t) * 8; i++) {
-                    ngramm_sum_buffer[i * n_blk + blk_idx] += l_ngramm_sum_buffer[i];
+                    s_ngramm_sum_buffer[i * blockDim.x + threadIdx.x] += l_ngramm_sum_buffer[i];
                 }
+            }
+        }
+
+        // add the last one and copy into global (result) memory
+        curr_x_chunk = NUM_INPUT_CHUNKS - 1;
+        __syncthreads();
+        if (curr_x_chunk == x_chunk_idx) {
+            // copy values back to ngramm_sum_buffer
+            for (i = 0; i < sizeof(block_t) * 8; i++) {
+                ngramm_sum_buffer[i * n_blk + blk_idx] = l_ngramm_sum_buffer[i] + s_ngramm_sum_buffer[i * blockDim.x + threadIdx.x];
             }
         }
     } else {
@@ -153,6 +177,15 @@ extern "C" void hd_encoder_call_kernel(
 {
     dim3 threads, grid;
     int smem_size;
+
+    // conmpute the maximum of n_items and 32, to make sure we have enough space for item lookup and reduction
+    int smem_parts;
+    if (state->n_items > sizeof(block_t) * 8) {
+        smem_parts = state->n_items;
+    } else {
+        smem_parts = sizeof(block_t) * 8;
+    }
+
     if (use_input_chunks) {
         // Each grid block calculates a chunk of the HD vector
         // for the entire input. Withing the block, threads divide work
@@ -163,12 +196,11 @@ extern "C" void hd_encoder_call_kernel(
         // compute the number of blocks used
         grid.x = (state->n_blk + NUM_HD_BLOCKS_IN_BLOCK - 1) / NUM_HD_BLOCKS_IN_BLOCK;
 
-        // compute shared memory size (for item lookup only)
-        smem_size = state->n_items * NUM_HD_BLOCKS_IN_BLOCK * sizeof(block_t);
+        smem_size = smem_parts * NUM_HD_BLOCKS_IN_BLOCK * sizeof(block_t);
     } else {
         threads.x = NUM_THREADS_IN_BLOCK;
         grid.x = (state->n_blk + NUM_THREADS_IN_BLOCK - 1) / NUM_THREADS_IN_BLOCK;
-        smem_size = state->n_items * NUM_THREADS_IN_BLOCK * sizeof(block_t);
+        smem_size = smem_parts * NUM_THREADS_IN_BLOCK * sizeof(block_t);
     }
 
     switch(state->ngramm) {
