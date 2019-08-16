@@ -8,8 +8,13 @@ extern "C" {
 }
 
 // number of threads per block in the grid
+#ifndef NUM_THREADS_IN_BLOCK
 #define NUM_THREADS_IN_BLOCK 128
+#endif
+
+#ifndef MAX_NUM_INPUT_CHUNKS
 #define MAX_NUM_INPUT_CHUNKS 4
+#endif
 
 #define NUM_HD_BLOCKS_IN_BLOCK (NUM_THREADS_IN_BLOCK / MAX_NUM_INPUT_CHUNKS)
 
