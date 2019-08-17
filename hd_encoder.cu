@@ -62,8 +62,8 @@ __global__ void hd_encoder_kernel(
     const int xored_n_x = n_x - (NGRAMM - 1);
     int x_chunk_len = (xored_n_x + NUM_INPUT_CHUNKS - 1) / NUM_INPUT_CHUNKS;
     const int x_chunk_start = x_chunk_idx * x_chunk_len;
-    if (x_chunk_start + x_chunk_len > n_x) {
-        x_chunk_len = n_x - x_chunk_start;
+    if (x_chunk_start + x_chunk_len > xored_n_x) {
+        x_chunk_len = xored_n_x - x_chunk_start;
     }
 
     int i; // iterator
