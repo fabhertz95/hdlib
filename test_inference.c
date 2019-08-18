@@ -100,9 +100,9 @@ int do_measurement(int from, int to, int step, int num_repeat) {
     // model is now loaded and ready to do inference!
 
     // prepare data
-    int n_x;
-    class_t y;
+    int n_x = to;
     /*
+    class_t y;
     feature_t * x = load_measurement_sample(&n_x, &y);
     if (x == NULL) {
         printf("no data found!\n");
@@ -173,6 +173,7 @@ int do_batch_measurement(int from, int to, int step, int num_repeat) {
 
     // load the measurement data multiple times
     int sample;
+    /*
     for (sample = 0; sample < BATCH_SIZE; sample++) {
         x[sample] = load_measurement_sample(&(n_x[sample]), &(y[sample]));
         if (x[sample] == NULL) {
@@ -180,6 +181,8 @@ int do_batch_measurement(int from, int to, int step, int num_repeat) {
         }
     }
     int original_n_x = n_x[0];
+    */
+    int original_n_x = to;
 
     int cur_len = from;
     while(cur_len <= to) {
@@ -187,10 +190,17 @@ int do_batch_measurement(int from, int to, int step, int num_repeat) {
         for (i = 0; i < num_repeat; i++) {
             // prepare n_x vector to all be cur_len
             for (sample = 0; sample < BATCH_SIZE; sample++) {
+                x[sample] = get_random_sample(cur_len, encoders[0].n_items);
                 n_x[sample] = cur_len;
             }
+
             // make prediction
             hd_classifier_predict_batch(&classifier, encoders, BATCH_SIZE, (const feature_t**)x, n_x, yhat);
+
+            // free up memory
+            for (sample = 0; sample < BATCH_SIZE; sample++) {
+                free(x[sample]);
+            }
         }
         // increment step
         cur_len += step;
@@ -198,9 +208,11 @@ int do_batch_measurement(int from, int to, int step, int num_repeat) {
     }
 
     // free up memory of measurement samples
+    /*
     for (sample = 0; sample < BATCH_SIZE; sample++) {
         free(x[sample]);
     }
+    */
 
     // free up all memory
     hd_batch_encoder_free(encoders, BATCH_SIZE);
