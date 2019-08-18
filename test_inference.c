@@ -68,6 +68,15 @@ feature_t * load_measurement_sample(int * n_x, class_t * y) {
     return load_binary_sample(filename, n_x, y);
 }
 
+feature_t * get_random_sample(int n_x, int n_items) {
+    feature_t * data = malloc(n_x * sizeof(feature_t));
+    int i;
+    for (i = 0; i < n_x; i++) {
+        data[i] = (feature_t)(rand() % n_items);
+    }
+    return data;
+}
+
 int do_measurement(int from, int to, int step, int num_repeat) {
     if (num_repeat <= 0) num_repeat = 1;
 
@@ -93,27 +102,32 @@ int do_measurement(int from, int to, int step, int num_repeat) {
     // prepare data
     int n_x;
     class_t y;
+    /*
     feature_t * x = load_measurement_sample(&n_x, &y);
     if (x == NULL) {
         printf("no data found!\n");
         return 1;
     }
+    */
 
     int cur_len = from;
 
     while(cur_len <= to) {
         int i;
         for (i = 0; i < num_repeat; i++) {
+            // generate random data
+            feature_t * x = get_random_sample(cur_len, encoder.n_items);
             // make prediction
             hd_classifier_predict(&classifier, &encoder, x, cur_len);
+            // free up memory
+            free(x);
         }
         // increment step
         cur_len += step;
         if (n_x < cur_len) break;
     }
 
-    // free the sample up again
-    free(x);
+    // free(x);
 
     // free up all memory
     hd_encoder_free(&encoder);
